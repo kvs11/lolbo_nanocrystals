@@ -1,0 +1,15 @@
+This folder should contain the following: 
+
+
+The convolution VAE:
+
+	Convert the VAE code from tensorflow to PyTorch
+
+(Use the existing InfoTransformerVAE or VAEModule classes in model_positional_unbounded.py to convert the conv VAE to PyTorch VAE)
+
+
+
+Tip: Keep a simple IrOx dataset in hand and check that the existing model and new VAE model perform similarly. For some 75 epochs, test on both the models and make sure that they are similar. 
+
+Keep a submit script in hand and submit multiple models to the scheduler instead of waiting and running on python using tensorflow and PyTorch on and off. 
+
