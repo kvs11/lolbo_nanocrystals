@@ -1,5 +1,3 @@
-import sys
-sys.path.append("../")
 import fire
 from lolbo_nanocrystal.scripts.optimize import Optimize
 from lolbo_nanocrystal.lolbo.nanocrystal_objective import NanoCrystalObjective
@@ -17,10 +15,12 @@ class NanoCrystalOptimization(Optimize):
     """
     def __init__(
         self,
-        path_to_vae_statedict: str="../lolbo/utils/mol_utils/selfies_vae/state_dict/SELFIES-VAE-state-dict.pt",
+        path_to_vae_statedict: str=None,
+        path_to_vae_ckpt: str="/sandbox/vkolluru/Gen_models_for_FANTASTX/May2023/1_LOLBO/practice/pt_model/m19/lightning_logs/NanoCrystalVAE/version_4/checkpoints/last.ckpt",
         **kwargs
     ):
         self.path_to_vae_statedict = path_to_vae_statedict
+        self.path_to_vae_ckpt = path_to_vae_ckpt
 
         super().__init__(**kwargs)
 
@@ -31,7 +31,8 @@ class NanoCrystalOptimization(Optimize):
     def initialize_objective(self):
         # initialize molecule objective
         self.objective = NanoCrystalObjective(
-            path_to_vae_statedict=self.path_to_vae_statedict
+            path_to_vae_statedict=self.path_to_vae_statedict,
+            path_to_vae_ckpt=self.path_to_vae_ckpt
         )
 
         # if train zs have not been pre-computed for particular vae, compute them 

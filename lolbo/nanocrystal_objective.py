@@ -11,13 +11,15 @@ class NanoCrystalObjective(LatentSpaceObjective):
 
     def __init__(
         self,
-        path_to_vae_statedict="../lolbo/utils/mol_utils/selfies_vae/state_dict/SELFIES-VAE-state-dict.pt",
+        path_to_vae_statedict: str=None,
+        path_to_vae_ckpt: str=None,
         xs_to_scores_dict={},
         num_calls=0,
     ):
 
         self.dim                    = 32 # NanoCrystal VAE DEFAULT LATENT SPACE DIM
         self.path_to_vae_statedict  = path_to_vae_statedict # path to trained vae stat dict
+        self.path_to_vae_ckpt = path_to_vae_ckpt
 
         super().__init__(
             num_calls=num_calls,
@@ -55,7 +57,7 @@ class NanoCrystalObjective(LatentSpaceObjective):
         # method to 
         # --> convert FTCP to VASP inputs
         # Runs VASP and returns the objective function value (eg. formation energy)
-        score = run_vasp_with_FTCP(x) 
+        score = get_y_val_from_input(x) 
 
         return score
 
@@ -68,7 +70,10 @@ class NanoCrystalObjective(LatentSpaceObjective):
         # load in state dict of trained model:
         if self.path_to_vae_ckpt:
             checkpoint = torch.load(self.path_to_vae_ckpt) 
-            self.vae.load_state_dict(checkpoint['state_dict'], strict=True) 
+            self.vae.load_state_dict(checkpoint['state_dict'], strict=True)
+        elif self.path_to_vae_statedict:
+            state_dict = torch.load(self.path_to_vae_statedict) 
+            self.vae.load_state_dict(state_dict, strict=True)
         self.vae = self.vae.cuda()
         self.vae = self.vae.eval()
 

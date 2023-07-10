@@ -4,8 +4,7 @@ import numpy as np
 import fire
 import warnings
 warnings.filterwarnings('ignore')
-from rdkit import RDLogger
-RDLogger.DisableLog('rdApp.*')
+
 import os
 os.environ["WANDB_SILENT"] = "True"
 from lolbo_nanocrystal.lolbo.lolbo import LOLBOState
