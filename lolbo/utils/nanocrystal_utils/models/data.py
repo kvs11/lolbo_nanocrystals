@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader, Dataset
 import torch.nn.functional as F
 from pathlib import Path
 
-from lolbo_nanocrystals.lolbo.utils.nanocrystal_utils.FTCP_conv_VAE.nano_utils import minmax
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.data_utils import minmax
 from sklearn.preprocessing import MinMaxScaler
 import numpy as np
 

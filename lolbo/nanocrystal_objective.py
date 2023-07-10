@@ -1,9 +1,9 @@
 import numpy as np
 import torch 
 
-from lolbo_nanocrystals.lolbo.latent_space_objective import LatentSpaceObjective
-from lolbo_nanocrystals.lolbo.utils.nanocrystal_utils.models.IrOx_VAE import NanoCrystalVAE
-from lolbo_nanocrystals.lolbo.utils.nanocrystal_utils.compute_black_box import run_vasp_with_FTCP
+from lolbo_nanocrystal.lolbo.latent_space_objective import LatentSpaceObjective
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.IrOx_VAE import NanoCrystalVAE
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.compute_black_box import get_y_val_from_input
 
 class NanoCrystalObjective(LatentSpaceObjective):
     '''MoleculeObjective class supports all molecule optimization

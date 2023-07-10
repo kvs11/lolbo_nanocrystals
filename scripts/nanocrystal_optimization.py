@@ -1,9 +1,9 @@
 import sys
 sys.path.append("../")
 import fire
-from scripts.optimize import Optimize
-from lolbo.nanocrystal_objective import NanoCrystalObjective
-from lolbo.utils.nanocrystal_utils.models.data_utils import load_nanocrystal_train_data, compute_train_zs
+from lolbo_nanocrystal.scripts.optimize import Optimize
+from lolbo_nanocrystal.lolbo.nanocrystal_objective import NanoCrystalObjective
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.data_utils import load_nanocrystal_train_data, compute_train_zs
 
 
 class NanoCrystalOptimization(Optimize):

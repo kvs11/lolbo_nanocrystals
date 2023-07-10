@@ -1,5 +1,5 @@
 # ppgpr
-#from .base import DenseNetwork
+from lolbo_nanocrystal.lolbo.utils.bo_utils.base import DenseNetwork
 import gpytorch
 from gpytorch.models import ApproximateGP
 from gpytorch.variational import CholeskyVariationalDistribution

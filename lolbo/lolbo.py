@@ -2,9 +2,9 @@ import torch
 import gpytorch
 import math
 from gpytorch.mlls import PredictiveLogLikelihood 
-#from lolbo.utils.bo_utils.turbo import TurboState, update_state, generate_batch
-#from lolbo.utils.utils import update_models_end_to_end, update_surr_model
-#from lolbo.utils.bo_utils.ppgpr import GPModelDKL
+from lolbo_nanocrystal.lolbo.utils.bo_utils.turbo import TurboState, update_state, generate_batch
+from lolbo_nanocrystal.lolbo.utils.utils import update_models_end_to_end, update_surr_model
+from lolbo_nanocrystal.lolbo.utils.bo_utils.ppgpr import GPModelDKL
 
 
 class LOLBOState:

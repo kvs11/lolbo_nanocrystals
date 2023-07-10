@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from torch.quasirandom import SobolEngine
 from botorch.acquisition import qExpectedImprovement
 from botorch.optim import optimize_acqf
-#from .approximate_gp import *
+from lolbo_nanocrystal.lolbo.utils.bo_utils.approximate_gp import *
 from botorch.generation import MaxPosteriorSampling 
 
 
