@@ -1,12 +1,12 @@
 import sys
 sys.path.append("../")
 import fire
-#from scripts.optimize import Optimize
-#from lolbo.molecule_objective import MoleculeObjective
-#from lolbo.utils.mol_utils.load_data import load_molecule_train_data, compute_train_zs
+from scripts.optimize import Optimize
+from lolbo.nanocrystal_objective import NanoCrystalObjective
+from lolbo.utils.nanocrystal_utils.models.data_utils import load_nanocrystal_train_data, compute_train_zs
 
 
-class MoleculeOptimization(Optimize):
+class NanoCrystalOptimization(Optimize):
     """
     Run LOLBO Optimization for any Molecular Optimization Task using the SELFIES VAE 
     (Must be either a GuacaMol Task or the Penalized LogP task)
@@ -18,11 +18,9 @@ class MoleculeOptimization(Optimize):
     def __init__(
         self,
         path_to_vae_statedict: str="../lolbo/utils/mol_utils/selfies_vae/state_dict/SELFIES-VAE-state-dict.pt",
-        max_string_length: int=1024,
         **kwargs
     ):
         self.path_to_vae_statedict = path_to_vae_statedict
-        self.max_string_length = max_string_length
 
         super().__init__(**kwargs)
 
@@ -32,18 +30,17 @@ class MoleculeOptimization(Optimize):
 
     def initialize_objective(self):
         # initialize molecule objective
-        self.objective = MoleculeObjective(
-            task_id=self.task_id,
-            path_to_vae_statedict=self.path_to_vae_statedict,
-            max_string_length=self.max_string_length,
-            smiles_to_selfies=self.init_smiles_to_selfies
+        self.objective = NanoCrystalObjective(
+            path_to_vae_statedict=self.path_to_vae_statedict
         )
+
         # if train zs have not been pre-computed for particular vae, compute them 
         #   by passing initialization selfies through vae 
         if self.init_train_z is None:
             self.init_train_z = compute_train_zs(
                 self.objective,
                 self.init_train_x,
+                self.init_train_graph_embeds
             )
 
         return self
@@ -57,24 +54,18 @@ class MoleculeOptimization(Optimize):
                 self.init_train_z (a tensor of corresponding latent space points)
             '''
         assert self.num_initialization_points <= 20_000 
-        smiles, selfies, zs, ys = load_molecule_train_data(
-            task_id=self.task_id,
-            num_initialization_points=self.num_initialization_points,
+        
+        self.init_train_x, self.init_train_graph_embeds, self.init_train_z, self.init_train_y  = load_nanocrystal_train_data(
+            num_initialization_points=self.num_initialization_points, # default is 10000 in Optimize
             path_to_vae_statedict=self.path_to_vae_statedict
         )
-        self.init_train_x, self.init_train_z, self.init_train_y = smiles, zs, ys
+
         if self.verbose:
             print("Loaded initial training data")
-            print("train y shape:", self.init_train_y.shape)
-            print(f"train x list length: {len(self.init_train_x)}\n")
+            print("train x shape:", self.init_train_x.shape)
 
-        # create initial smiles to selfies dict
-        self.init_smiles_to_selfies = {}
-        for ix, smile in enumerate(self.init_train_x):
-            self.init_smiles_to_selfies[smile] = selfies[ix]
-
-        return self 
+        return self
 
 
 if __name__ == "__main__":
-    fire.Fire(MoleculeOptimization)
+    fire.Fire(NanoCrystalOptimization)

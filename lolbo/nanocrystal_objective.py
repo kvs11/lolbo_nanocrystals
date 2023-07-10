@@ -1,47 +1,30 @@
 import numpy as np
 import torch 
-import selfies as sf 
-#from lolbo.utils.mol_utils.mol_utils import smiles_to_desired_scores
-#from lolbo.utils.mol_utils.selfies_vae.model_positional_unbounded import SELFIESDataset, InfoTransformerVAE
-#from lolbo.utils.mol_utils.selfies_vae.data import collate_fn
-#from lolbo.latent_space_objective import LatentSpaceObjective
-#from lolbo.utils.mol_utils.mol_utils import GUACAMOL_TASK_NAMES
-import pkg_resources
-# make sure molecule software versions are correct: 
-try:
-    assert pkg_resources.get_distribution("selfies").version == '2.0.0'
-    assert pkg_resources.get_distribution("rdkit-pypi").version == '2022.3.1'
-    assert pkg_resources.get_distribution("molsets").version == '0.3.1'
-except:
-    print ("Assertion error!!! Check package versions of selfies/rdkit-pypi/molsets")
 
+from lolbo_nanocrystals.lolbo.latent_space_objective import LatentSpaceObjective
+from lolbo_nanocrystals.lolbo.utils.nanocrystal_utils.models.IrOx_VAE import NanoCrystalVAE
+from lolbo_nanocrystals.lolbo.utils.nanocrystal_utils.compute_black_box import run_vasp_with_FTCP
 
-class MoleculeObjective(LatentSpaceObjective):
+class NanoCrystalObjective(LatentSpaceObjective):
     '''MoleculeObjective class supports all molecule optimization
         tasks and uses the SELFIES VAE by default '''
 
     def __init__(
         self,
-        task_id='pdop',
         path_to_vae_statedict="../lolbo/utils/mol_utils/selfies_vae/state_dict/SELFIES-VAE-state-dict.pt",
         xs_to_scores_dict={},
-        max_string_length=1024,
         num_calls=0,
-        smiles_to_selfies={},
     ):
-        assert task_id in GUACAMOL_TASK_NAMES + ["logp"]
 
-        self.dim                    = 256 # SELFIES VAE DEFAULT LATENT SPACE DIM
+        self.dim                    = 32 # NanoCrystal VAE DEFAULT LATENT SPACE DIM
         self.path_to_vae_statedict  = path_to_vae_statedict # path to trained vae stat dict
-        self.max_string_length      = max_string_length # max string length that VAE can generate
-        self.smiles_to_selfies      = smiles_to_selfies # dict to hold computed mappings form smiles to selfies strings
 
         super().__init__(
             num_calls=num_calls,
             xs_to_scores_dict=xs_to_scores_dict,
-            task_id=task_id,
+            # task_id=task_id,
         )
-        
+
 
     def vae_decode(self, z):
         '''Input
@@ -56,18 +39,9 @@ class MoleculeObjective(LatentSpaceObjective):
         self.vae = self.vae.eval()
         self.vae = self.vae.cuda()
         # sample molecular string form VAE decoder
-        sample = self.vae.sample(z=z.reshape(-1, 2, 128))
-        # grab decoded selfies strings
-        decoded_selfies = [self.dataobj.decode(sample[i]) for i in range(sample.size(-2))]
-        # decode selfies strings to smiles strings (SMILES is needed format for oracle)
-        decoded_smiles = []
-        for selfie in decoded_selfies:
-            smile = sf.decoder(selfie)
-            decoded_smiles.append(smile)
-            # save smile to selfie mapping to map back later if needed
-            self.smiles_to_selfies[smile] = selfie
+        decoded_sample = self.vae.sample(z=z.reshape(-1, 2, 128))
 
-        return decoded_smiles
+        return decoded_sample
 
 
     def query_oracle(self, x):
@@ -78,8 +52,10 @@ class MoleculeObjective(LatentSpaceObjective):
                 the corresponding score y,
                 or np.nan in the case that x is an invalid input
         '''
-        # method assumes x is a single smiles string
-        score = smiles_to_desired_scores([x], self.task_id).item()
+        # method to 
+        # --> convert FTCP to VASP inputs
+        # Runs VASP and returns the objective function value (eg. formation energy)
+        score = run_vasp_with_FTCP(x) 
 
         return score
 
@@ -88,19 +64,16 @@ class MoleculeObjective(LatentSpaceObjective):
         ''' Sets self.vae to the desired pretrained vae and 
             sets self.dataobj to the corresponding data class 
             used to tokenize inputs, etc. '''
-        self.dataobj = SELFIESDataset()
-        self.vae = InfoTransformerVAE(dataset=self.dataobj)
+        self.vae = NanoCrystalVAE()
         # load in state dict of trained model:
-        if self.path_to_vae_statedict:
-            state_dict = torch.load(self.path_to_vae_statedict) 
-            self.vae.load_state_dict(state_dict, strict=True) 
+        if self.path_to_vae_ckpt:
+            checkpoint = torch.load(self.path_to_vae_ckpt) 
+            self.vae.load_state_dict(checkpoint['state_dict'], strict=True) 
         self.vae = self.vae.cuda()
         self.vae = self.vae.eval()
-        # set max string length that VAE can generate
-        self.vae.max_string_length = self.max_string_length
 
 
-    def vae_forward(self, xs_batch):
+    def vae_forward(self, xs_batch, graph_embds_batch):
         ''' Input: 
                 a list xs 
             Output: 
@@ -111,19 +84,7 @@ class MoleculeObjective(LatentSpaceObjective):
                     (ie reconstruction error)
         '''
         # assumes xs_batch is a batch of smiles strings 
-        X_list = []
-        for smile in xs_batch:
-            try:
-                # avoid re-computing mapping from smiles to selfies to save time
-                selfie = self.smiles_to_selfies[smile]
-            except:
-                selfie = sf.encoder(smile)
-                self.smiles_to_selfies[smile] = selfie
-            tokenized_selfie = self.dataobj.tokenize_selfies([selfie])[0]
-            encoded_selfie = self.dataobj.encode(tokenized_selfie).unsqueeze(0)
-            X_list.append(encoded_selfie)
-        X = collate_fn(X_list)
-        dict = self.vae(X.cuda())
+        dict = self.vae(xs_batch.cuda(), graph_embds_batch.cuda())
         vae_loss, z = dict['loss'], dict['z']
         z = z.reshape(-1,self.dim)
 
@@ -132,7 +93,8 @@ class MoleculeObjective(LatentSpaceObjective):
 
 if __name__ == "__main__":
     # testing molecule objective
-    obj1 = MoleculeObjective(task_id='pdop' ) 
+    obj1 = NanoCrystalObjective() 
+    print ("*** Test Test Test ***")
     print(obj1.num_calls)
     dict1 = obj1(torch.randn(10,256))
     print(dict1['scores'], obj1.num_calls)
