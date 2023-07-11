@@ -17,6 +17,9 @@ class LatentSpaceObjective:
         task_id=''
         ):
 
+        # Initialize a comparator class with the pool of all existing structures
+        self.initialize_comparator()
+
         # dict used to track xs and scores (ys) queried during optimization
         self.xs_to_scores_dict = xs_to_scores_dict 
         
@@ -46,8 +49,10 @@ class LatentSpaceObjective:
         decoded_xs = self.vae_decode(z)
         scores = []
         for x in decoded_xs:
-            # if we have already computed the score, don't 
-            #   re-compute (don't call oracle unnecessarily)
+            # VSCK: First make sure that the decoded structure is not a duplicate
+            # of structures present in the pool
+            # TODO: Check duplicates with Comparator from FANTASTX
+
             if x in self.xs_to_scores_dict:
                 score = self.xs_to_scores_dict[x]
             else: # otherwise call the oracle to get score
@@ -103,6 +108,10 @@ class LatentSpaceObjective:
         ''' Sets variable self.vae to the desired pretrained vae '''
         raise NotImplementedError("Must implement method initialize_vae() to load in vae for desired optimization task")
 
+    def initialize_comparator(self):
+        ''' Sets variable self.comparator to the Comparator class with appropriate parameters 
+        Currently using bag-of-bonds with respective thresholds. '''
+        raise NotImplementedError("Must implement method initialize_comparator() with bag-of-bonds comparator")
 
     def vae_forward(self, xs_batch):
         ''' Input: 

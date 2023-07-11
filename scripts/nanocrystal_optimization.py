@@ -17,10 +17,14 @@ class NanoCrystalOptimization(Optimize):
         self,
         path_to_vae_statedict: str=None,
         path_to_vae_ckpt: str="/sandbox/vkolluru/Gen_models_for_FANTASTX/May2023/1_LOLBO/practice/pt_model/m19/lightning_logs/NanoCrystalVAE/version_4/checkpoints/last.ckpt",
+        fp_label: str='bag-of-bonds',
+        fp_tolerances=[0.04, 0.7],
         **kwargs
     ):
         self.path_to_vae_statedict = path_to_vae_statedict
         self.path_to_vae_ckpt = path_to_vae_ckpt
+        self.fp_label = fp_label
+        self.fp_tolerances = fp_tolerances
 
         super().__init__(**kwargs)
 
@@ -32,7 +36,9 @@ class NanoCrystalOptimization(Optimize):
         # initialize molecule objective
         self.objective = NanoCrystalObjective(
             path_to_vae_statedict=self.path_to_vae_statedict,
-            path_to_vae_ckpt=self.path_to_vae_ckpt
+            path_to_vae_ckpt=self.path_to_vae_ckpt,
+            fp_label=self.fp_label,
+            fp_tolerances=self.fp_tolerances
         )
 
         # if train zs have not been pre-computed for particular vae, compute them 

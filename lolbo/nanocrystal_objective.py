@@ -4,6 +4,7 @@ import torch
 from lolbo_nanocrystal.lolbo.latent_space_objective import LatentSpaceObjective
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.IrOx_VAE import NanoCrystalVAE
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.compute_black_box import get_y_val_from_input
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.fingerprinting import Comparator
 
 class NanoCrystalObjective(LatentSpaceObjective):
     '''MoleculeObjective class supports all molecule optimization
@@ -13,6 +14,8 @@ class NanoCrystalObjective(LatentSpaceObjective):
         self,
         path_to_vae_statedict: str=None,
         path_to_vae_ckpt: str=None,
+        fp_label: str='bag-of-bonds',
+        fp_tolerances=None,
         xs_to_scores_dict={},
         num_calls=0,
     ):
@@ -20,6 +23,8 @@ class NanoCrystalObjective(LatentSpaceObjective):
         self.dim                    = 32 # NanoCrystal VAE DEFAULT LATENT SPACE DIM
         self.path_to_vae_statedict  = path_to_vae_statedict # path to trained vae stat dict
         self.path_to_vae_ckpt = path_to_vae_ckpt
+        self.fp_label = fp_label
+        self.fp_tolerances = fp_tolerances
 
         super().__init__(
             num_calls=num_calls,
@@ -77,6 +82,12 @@ class NanoCrystalObjective(LatentSpaceObjective):
         self.vae = self.vae.cuda()
         self.vae = self.vae.eval()
 
+    def initialize_comparator(self):
+        ''' Sets variable self.comparator to the Comparator class with appropriate parameters 
+            The Comparator should be connected with FANTASTX iin future. 
+            For dev purposes, fingerprinting.py is copied from fantastx entirely. 
+            (Currently using bag-of-bonds with respective thresholds) '''
+        self.comparator = Comparator(label=self.fp_label, tolerances=self.fp_tolerances)
 
     def vae_forward(self, xs_batch, graph_embds_batch):
         ''' Input: 
