@@ -5,6 +5,7 @@ from gpytorch.mlls import PredictiveLogLikelihood
 from lolbo_nanocrystal.lolbo.utils.bo_utils.turbo import TurboState, update_state, generate_batch
 from lolbo_nanocrystal.lolbo.utils.utils import update_models_end_to_end, update_surr_model
 from lolbo_nanocrystal.lolbo.utils.bo_utils.ppgpr import GPModelDKL
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.structure import get_astr_from_PC
 
 
 class LOLBOState:
@@ -13,6 +14,7 @@ class LOLBOState:
         self,
         objective,
         train_x,
+        #graph_embeds,
         train_y,
         train_z,
         k=1_000,
@@ -24,9 +26,12 @@ class LOLBOState:
         acq_func='ts',
         verbose=True,
         ):
+        # NOTE: Included graph embeddings to be complete. However, it is not needed for LOLBO
+        # train_x (Structure, input PC) and train_y (score) is enough. Remove graph_embeds later..
 
         self.objective          = objective         # objective with vae for particular task
         self.train_x            = train_x           # initial train x data
+        #self.graph_embeds       = graph_embeds      # MEGNet graph embeddings to use in NanoCrystalVAE
         self.train_y            = train_y           # initial train y data
         self.train_z            = train_z           # initial train z data
         self.minimize           = minimize          # if True we want to minimize the objective, otherwise we assume we want to maximize the objective
@@ -52,7 +57,10 @@ class LOLBOState:
         self.initialize_top_k()
         self.initialize_surrogate_model()
         self.initialize_tr_state()
-        self.initialize_xs_to_scores_dict()
+        #self.initialize_xs_to_scores_dict() 
+        # VSCK: Renaming xs_to_scores_dict to pool_dict
+        # NOTE: This is part of the LOLBO routine.
+        self.initialize_pool_dict()
 
 
     def initialize_xs_to_scores_dict(self,):
@@ -62,6 +70,23 @@ class LOLBOState:
             init_xs_to_scores_dict[x] = self.train_y.squeeze()[idx].item()
         self.objective.xs_to_scores_dict = init_xs_to_scores_dict
 
+    def initialize_pool_dict(self):
+        ''' Generate a label for each sample; 
+        Assign astr (pymatgen structure), PC array (xs), and score (ys) for each label'''
+        init_pool_dict = {}
+        for idx, pc_x in enumerate(self.train_x):
+            key = f'sample_{idx}'
+            astr_x = get_astr_from_PC(pc_x)
+            #graph_embeds_x = self.graph_embeds[idx]
+            score = self.train_y.squeeze()[idx].item()
+            init_pool_dict[key] = {
+                'astr': astr_x,
+                'PC_x': pc_x,
+                #'graph_embeds': graph_embeds_x,
+                'score': score
+            }
+        self.objective.pool_dict = init_pool_dict
+        self.objective.labels_count = len(self.train_x)
 
     def initialize_top_k(self):
         ''' Initialize top k x, y, and zs'''

@@ -12,7 +12,8 @@ class LatentSpaceObjective:
 
     def __init__(
         self,
-        xs_to_scores_dict={},
+        pool_dict={},
+        labels_count=0,
         num_calls=0,
         task_id=''
         ):
@@ -20,8 +21,12 @@ class LatentSpaceObjective:
         # Initialize a comparator class with the pool of all existing structures
         self.initialize_comparator()
 
-        # dict used to track xs and scores (ys) queried during optimization
-        self.xs_to_scores_dict = xs_to_scores_dict 
+        # NOTE: pool_dict and label_count are initiated in LOLBO_state, and 
+        # will be maintained in sync throughout LSO and NCO
+        # dict used to track labels with their xs (input arrays) and 
+        # scores (ys) queried during optimization
+        self.pool_dict = pool_dict # xs_to_scores_dict 
+        self.label_count = labels_count
         
         # track total number of times the oracle has been called
         self.num_calls = num_calls
@@ -48,24 +53,39 @@ class LatentSpaceObjective:
             z = torch.from_numpy(z).float()
         decoded_xs = self.vae_decode(z)
         scores = []
-        for x in decoded_xs:
+        for pc_x in decoded_xs:
             # VSCK: First make sure that the decoded structure is not a duplicate
             # of structures present in the pool
-            # TODO: Check duplicates with Comparator from FANTASTX
 
-            if x in self.xs_to_scores_dict:
-                score = self.xs_to_scores_dict[x]
+            # VSCK: Get label key for pool_dict
+            key = 'sample_{}'.format(self.labels_count + 1)
+            astr_x = get_astr_from_PC(pc_x)
+            
+            # Add the new sample to pool_dict
+
+            dupe_key = None
+            # TODO: Check duplicates with Comparator from FANTASTX
+            if dupe_key is not None:
+                score = self.pool_dict[dupe_key]['score']
+                print ('Place holder for structure comparator')
             else: # otherwise call the oracle to get score
                 score = self.query_oracle(x)
-                # add score to dict so we don't have to
-                #   compute it again if we get the same input x
-                self.xs_to_scores_dict[x] = score
+                key_dict = {
+                            'astr': astr_x,
+                            'PC_x': pc_x,
+                            'score': score
+                }
+                self.pool_dict[key] = key_dict 
+                # TODO: Remove this molecule related condition and insert 
+                # any other nanocrystal related condition if needed
                 # track number of oracle calls 
                 #   nan scores happen when we pass an invalid
                 #   molecular string and thus avoid calling the
                 #   oracle entirely
                 if np.logical_not(np.isnan(score)):
                     self.num_calls += 1
+                self.labels_count += 1
+
             scores.append(score)
 
         scores_arr = np.array(scores)

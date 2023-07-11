@@ -16,7 +16,8 @@ class NanoCrystalObjective(LatentSpaceObjective):
         path_to_vae_ckpt: str=None,
         fp_label: str='bag-of-bonds',
         fp_tolerances=None,
-        xs_to_scores_dict={},
+        pool_dict={},
+        labels_count=0,
         num_calls=0,
     ):
 
@@ -28,8 +29,8 @@ class NanoCrystalObjective(LatentSpaceObjective):
 
         super().__init__(
             num_calls=num_calls,
-            xs_to_scores_dict=xs_to_scores_dict,
-            # task_id=task_id,
+            pool_dict=pool_dict,
+            labels_count=labels_count,
         )
 
 
