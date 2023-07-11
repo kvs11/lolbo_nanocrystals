@@ -98,9 +98,9 @@ def load_nanocrystal_train_data(
     y_vals_path = path_prefix + '/L1_Ys.npy'
     embds_path = path_prefix + '/L1_grph_embds.npy'
 
-    input_array = np.load(inp_arr_path, allow_pickle=True).astype('float32')
-    y_values_array = np.load(y_vals_path, allow_pickle=True).astype('float32')
-    graph_embeds_array = np.load(embds_path, allow_pickle=True).astype('float32')
+    input_array = torch.from_numpy(np.load(inp_arr_path, allow_pickle=True).astype('float32'))
+    y_values_array = torch.from_numpy(np.load(y_vals_path, allow_pickle=True).astype('float32'))
+    graph_embeds_array = torch.from_numpy(np.load(embds_path, allow_pickle=True).astype('float32'))
 
     # Always compute train_zs from the VAE instead of loading pre-computed 
     # because its consistent when changing different VAE models

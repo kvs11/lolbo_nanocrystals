@@ -89,8 +89,8 @@ class NanoCrystalObjective(LatentSpaceObjective):
                     (ie reconstruction error)
         '''
         # assumes xs_batch is a batch of smiles strings 
-        dict = self.vae(xs_batch.cuda(), graph_embds_batch.cuda())
-        vae_loss, z = dict['loss'], dict['z']
+        dict_ = self.vae(xs_batch.cuda(), graph_embds_batch.cuda())
+        vae_loss, z = dict_['loss'], dict_['z']
         z = z.reshape(-1,self.dim)
 
         return z, vae_loss

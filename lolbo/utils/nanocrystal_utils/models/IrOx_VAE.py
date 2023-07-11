@@ -287,6 +287,7 @@ class NanoCrystalVAE(pl.LightningModule):
         reconstructed_output_ = self.decoder(z)
 
         return dict(
+            z=z,
             mu=mu_,
             log_var=log_var_,
             reg_output=reg_output_,
