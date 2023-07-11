@@ -88,12 +88,23 @@ class NanoCrystalObjective(LatentSpaceObjective):
                     of the batch of xs through the vae 
                     (ie reconstruction error)
         '''
-        # assumes xs_batch is a batch of smiles strings 
+        def list_or_np_to_tensor(xx):
+            np_arr = np.array(xx, dtype='float32')
+            xx = torch.from_numpy(np_arr)
+            del np_arr
+            return xx
+        
+        # convert xs_batch and graph_embeds to tensors if needed
+        if not torch.is_tensor(xs_batch):
+            xs_batch = list_or_np_to_tensor(xs_batch)
+        if not torch.is_tensor(graph_embds_batch):
+            graph_embds_batch = list_or_np_to_tensor(graph_embds_batch)
+
         dict_ = self.vae(xs_batch.cuda(), graph_embds_batch.cuda())
-        vae_loss, z = dict_['loss'], dict_['z']
+        z = dict_['z']
         z = z.reshape(-1,self.dim)
 
-        return z, vae_loss
+        return z
 
 
 if __name__ == "__main__":
