@@ -299,8 +299,8 @@ class NanoCrystalVAE(pl.LightningModule):
         input_xs, embed_xs = inputs
         outputs_dict = self(input_xs, embed_xs)
 
-        mu_, log_var_, reg_output_, reconstructed_output_ = itemgetter(
-            'mu', 'log_var', 'reg_output', 'reconstructed_output')(outputs_dict)
+        _, mu_, log_var_, reg_output_, reconstructed_output_ = itemgetter(
+            'z', 'mu', 'log_var', 'reg_output', 'reconstructed_output')(outputs_dict)
         
         # Compute the loss and its gradients
         loss_fn_args = [reconstructed_output_, input_xs, mu_, log_var_, reg_output_, target_ys]
@@ -323,8 +323,8 @@ class NanoCrystalVAE(pl.LightningModule):
         outputs_dict = self(input_xs, embed_xs)
 
         #mu, log_var, reg_output, reconstructed_output = outputs
-        mu_, log_var_, reg_output_, reconstructed_output_ = itemgetter(
-            'mu', 'log_var', 'reg_output', 'reconstructed_output')(outputs_dict)
+        _, mu_, log_var_, reg_output_, reconstructed_output_ = itemgetter(
+            'z', 'mu', 'log_var', 'reg_output', 'reconstructed_output')(outputs_dict)
         
         # Compute the loss and its gradients
         loss_fn_args = [reconstructed_output_, input_xs, mu_, log_var_, reg_output_, target_ys]
