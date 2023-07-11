@@ -46,12 +46,12 @@ from ase.ga.ofp_comparator import OFPComparator
 from pymatgen.io.ase import AseAtomsAdaptor
 import copy
 from sklearn.preprocessing import normalize
-from fx19 import distance_check as dc
 import numpy as np
 from sklearn.metrics import pairwise_distances, pairwise
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from pymatgen.core.structure import Structure, Lattice
 
+import lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.distance_check as dc
 
 def cutoff(dist, dist_cut):
     if dist < dist_cut:
