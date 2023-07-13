@@ -46,7 +46,7 @@ class NanoCrystalOptimization(Optimize):
         if self.init_train_z is None:
             self.init_train_z = compute_train_zs(
                 self.objective,
-                self.init_train_x,
+                self.init_train_x_tensor,
                 self.init_train_graph_embeds
             )
 
@@ -62,14 +62,15 @@ class NanoCrystalOptimization(Optimize):
             '''
         assert self.num_initialization_points <= 20_000 
         
-        self.init_train_x, self.init_train_graph_embeds, self.init_train_z, self.init_train_y  = load_nanocrystal_train_data(
-            num_initialization_points=self.num_initialization_points, # default is 10000 in Optimize
+        self.init_train_x_tensor, self.init_train_graph_embeds, self.init_train_z, self.init_train_y  = load_nanocrystal_train_data(
+            num_initialization_points=self.num_initialization_points, 
             path_to_vae_statedict=self.path_to_vae_statedict
         )
-
+        # VSCK: init_train_x in molecules is divided into init_train_x_keys and init_train_x_tensor. 
+        # Both will be used interchageably as required in the LOLBO framework
+        self.init_train_x_keys = ['sample_{i}' for i in range(self.init_train_x_tensor.shape[0])]
         if self.verbose:
             print("Loaded initial training data")
-            print("train x shape:", self.init_train_x.shape)
 
         return self
 
