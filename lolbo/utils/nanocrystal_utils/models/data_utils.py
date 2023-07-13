@@ -87,20 +87,18 @@ def MAE_site_coor(SITE_COOR, SITE_COOR_recon, Nsites):
     site_recon = np.vstack(site_recon)
     return np.mean(np.ravel(np.abs(site - site_recon)))
 
+
 ########################## Data Loading Helper Functions ##########################
 
-def load_nanocrystal_train_data(
-                    path_to_vae_statedict,
-                    num_initialization_points=10_000,
-): 
+def load_nanocrystal_train_data(): 
     path_prefix = '/home/vkolluru/GenerativeModeling/Datasets_164x3'
     inp_arr_path = path_prefix + '/L1_Xs.npy'
     y_vals_path = path_prefix + '/L1_Ys.npy'
     embds_path = path_prefix + '/L1_grph_embds.npy'
 
     # NOTE: LOLBO requires that inputs be list; y_vals & zs be a tensor
-    input_array = np.load(inp_arr_path, allow_pickle=True).astype('float32').tolist()
-    graph_embeds_array = np.load(embds_path, allow_pickle=True).astype('float32').tolist()
+    input_array = torch.from_numpy(np.load(inp_arr_path, allow_pickle=True).astype('float32'))
+    graph_embeds_array = torch.from_numpy(np.load(embds_path, allow_pickle=True).astype('float32'))
     y_values_array = torch.from_numpy(np.load(y_vals_path, allow_pickle=True).astype('float32'))
 
     # Always compute train_zs from the VAE instead of loading pre-computed 
@@ -108,7 +106,8 @@ def load_nanocrystal_train_data(
     # zs will be computed in NanoCrystalOptimization initialize_objective. 
     zs_from_inputs = None 
 
-    return input_array, graph_embeds_array, zs_from_inputs, y_values_array
+    input_key_names = [f'sample_{i}' for i in range(input_array.shape[0])]
+    return input_key_names, input_array, graph_embeds_array, zs_from_inputs, y_values_array
 
 
 def compute_train_zs(
