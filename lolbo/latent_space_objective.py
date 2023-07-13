@@ -1,5 +1,6 @@
 import numpy as np
 import torch 
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.structure import get_astr_from_PC, get_graph_embeds_from_astr
 
 
 class LatentSpaceObjective:
@@ -26,7 +27,6 @@ class LatentSpaceObjective:
         # dict used to track labels with their xs (input arrays) and 
         # scores (ys) queried during optimization
         self.pool_dict = pool_dict # xs_to_scores_dict 
-        self.label_count = labels_count
         
         # track total number of times the oracle has been called
         self.num_calls = num_calls
@@ -41,9 +41,11 @@ class LatentSpaceObjective:
         assert self.vae is not None
 
 
-    def __call__(self, z):
+    def __call__(self, z, start_key_idx):
         ''' Input 
                 z: a numpy array or pytorch tensor of latent space points
+                start_key_idx: The starting integer index for the new set of sampled zs (in latent space). 
+                Used to add new samples to pool_di with correct key.
             Output
                 out_dict['valid_zs'] = the zs which decoded to valid xs 
                 out_dict['decoded_xs'] = an array of valid xs obtained from input zs
@@ -53,40 +55,24 @@ class LatentSpaceObjective:
             z = torch.from_numpy(z).float()
         decoded_xs = self.vae_decode(z)
         scores = []
+        astr_xs = []
         for pc_x in decoded_xs:
             # VSCK: First make sure that the decoded structure is not a duplicate
             # of structures present in the pool
-
-            # VSCK: Get label key for pool_dict
-            key = 'sample_{}'.format(self.labels_count + 1)
             astr_x = get_astr_from_PC(pc_x)
-            
-            # Add the new sample to pool_dict
-
             dupe_key = None
             # TODO: Check duplicates with Comparator from FANTASTX
             if dupe_key is not None:
                 score = self.pool_dict[dupe_key]['score']
                 print ('Place holder for structure comparator')
+
             else: # otherwise call the oracle to get score
-                score = self.query_oracle(x)
-                key_dict = {
-                            'astr': astr_x,
-                            'PC_x': pc_x,
-                            'score': score
-                }
-                self.pool_dict[key] = key_dict 
-                # TODO: Remove this molecule related condition and insert 
-                # any other nanocrystal related condition if needed
-                # track number of oracle calls 
-                #   nan scores happen when we pass an invalid
-                #   molecular string and thus avoid calling the
-                #   oracle entirely
+                score = self.query_oracle(astr_x, )
                 if np.logical_not(np.isnan(score)):
                     self.num_calls += 1
-                self.labels_count += 1
 
             scores.append(score)
+            astr_xs.append(astr_x)
 
         scores_arr = np.array(scores)
         decoded_xs = np.array(decoded_xs)
@@ -96,10 +82,21 @@ class LatentSpaceObjective:
         scores_arr = scores_arr[bool_arr]
         valid_zs = z[bool_arr]
 
+        # update pool_dict with new samples (decoded valid_zs)
+        for i in range(len(valid_zs)):
+            key = f'sample_{start_key_idx+i}'
+            graph_embeds_x = get_graph_embeds_from_astr(astr_xs[i])
+            key_dict = {'PC': decoded_xs[i], 
+                        'astr': astr_xs[i],
+                        'grph_embds': graph_embeds_x,
+                        'score': scores_arr[i]}
+            self.pool_dict[key] = key_dict 
+
         out_dict = {}
         out_dict['scores'] = scores_arr
         out_dict['valid_zs'] = valid_zs
-        out_dict['decoded_xs'] = decoded_xs
+        out_dict['decoded_xs_tensor'] = decoded_xs
+        #out_dict['decoded_xs_keys'] = decoded_keys # VSCK: The xs_keys are stored in Lolbo_State; only used in lolbo_state; So not generated in Objective
         return out_dict
 
 
