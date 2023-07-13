@@ -13,7 +13,8 @@ class LOLBOState:
     def __init__(
         self,
         objective,
-        train_x,
+        train_x_keys,
+        train_x_tensor,
         #graph_embeds,
         train_y,
         train_z,
@@ -30,8 +31,9 @@ class LOLBOState:
         # train_x (Structure, input PC) and train_y (score) is enough. Remove graph_embeds later..
 
         self.objective          = objective         # objective with vae for particular task
-        self.train_x            = train_x           # initial train x data
-        #self.graph_embeds       = graph_embeds      # MEGNet graph embeddings to use in NanoCrystalVAE
+        self.train_x_keys       = train_x_keys
+        self.train_x_tensor     = train_x_tensor    # initial train x data
+        self.graph_embeds      = graph_embeds      # MEGNet graph embeddings to use in NanoCrystalVAE
         self.train_y            = train_y           # initial train y data
         self.train_z            = train_z           # initial train z data
         self.minimize           = minimize          # if True we want to minimize the objective, otherwise we assume we want to maximize the objective
@@ -50,7 +52,7 @@ class LOLBOState:
         self.progress_fails_since_last_e2e = 0
         self.tot_num_e2e_updates = 0
         self.best_score_seen = torch.max(train_y)
-        self.best_x_seen = train_x[torch.argmax(train_y.squeeze())]
+        self.best_x_seen = train_x_keys[torch.argmax(train_y.squeeze())]
         self.initial_model_training_complete = False # initial training of surrogate model uses all data for more epochs
         self.new_best_found = False
 
@@ -59,34 +61,34 @@ class LOLBOState:
         self.initialize_tr_state()
         #self.initialize_xs_to_scores_dict() 
         # VSCK: Renaming xs_to_scores_dict to pool_dict
-        # NOTE: This is part of the LOLBO routine.
-        self.initialize_pool_dict()
+        # NOTE: Although pool_dict is actually created here, it is kept as objective attribute. So, naming appropriately
+        self.initialize_pool_dict_to_objective()
 
 
-    def initialize_xs_to_scores_dict(self,):
-        # put initial xs and ys in dict to be tracked by objective
-        init_xs_to_scores_dict = {}
-        for idx, x in enumerate(self.train_x):
-            init_xs_to_scores_dict[x] = self.train_y.squeeze()[idx].item()
-        self.objective.xs_to_scores_dict = init_xs_to_scores_dict
+    #def initialize_xs_to_scores_dict(self,):
+    #    # put initial xs and ys in dict to be tracked by objective
+    #    init_xs_to_scores_dict = {}
+    #    for idx, x in enumerate(self.train_x):
+    #        init_xs_to_scores_dict[x] = self.train_y.squeeze()[idx].item()
+    #    self.objective.xs_to_scores_dict = init_xs_to_scores_dict
 
-    def initialize_pool_dict(self):
+    def initialize_pool_dict_to_objective(self):
         ''' Generate a label for each sample; 
         Assign astr (pymatgen structure), PC array (xs), and score (ys) for each label'''
         init_pool_dict = {}
-        for idx, pc_x in enumerate(self.train_x):
-            key = f'sample_{idx}'
+        for idx, key in enumerate(self.train_x_keys):
+            pc_x = self.train_x_tensor[idx]
             astr_x = get_astr_from_PC(pc_x)
-            #graph_embeds_x = self.graph_embeds[idx]
+            graph_embeds_x = self.graph_embeds[idx]
             score = self.train_y.squeeze()[idx].item()
             init_pool_dict[key] = {
+                'PC': pc_x,
                 'astr': astr_x,
-                'PC_x': pc_x,
-                #'graph_embeds': graph_embeds_x,
+                'grph_embds': graph_embeds_x,
                 'score': score
             }
         self.objective.pool_dict = init_pool_dict
-        self.objective.labels_count = len(self.train_x)
+
 
     def initialize_top_k(self):
         ''' Initialize top k x, y, and zs'''
@@ -94,7 +96,8 @@ class LOLBOState:
         self.top_k_scores, top_k_idxs = torch.topk(self.train_y.squeeze(), min(self.k, len(self.train_y)))
         self.top_k_scores = self.top_k_scores.tolist()
         top_k_idxs = top_k_idxs.tolist()
-        self.top_k_xs = [self.train_x[i] for i in top_k_idxs]
+        self.top_k_xs_keys = [self.train_x_keys[i] for i in top_k_idxs]
+        self.top_k_xs_tensor = [self.train_x_tensor[i] for i in top_k_idxs]
         self.top_k_zs = [self.train_z[i].unsqueeze(-2) for i in top_k_idxs]
 
 
@@ -120,38 +123,43 @@ class LOLBOState:
         return self
 
 
-    def update_next(self, z_next_, y_next_, x_next_, acquisition=False):
+    def update_next(self, z_next_, y_next_, x_next_tensor, x_next_keys, acquisition=False):
         '''Add new points (z_next, y_next, x_next) to train data
             and update progress (top k scores found so far)
             and update trust region state
         '''
         z_next_ = z_next_.detach().cpu() 
         y_next_ = y_next_.detach().cpu()
+        x_next_tensor = x_next_tensor.detach().cpu()
+
         if len(y_next_.shape) > 1:
             y_next_ = y_next_.squeeze() 
         if len(z_next_.shape) == 1:
             z_next_ = z_next_.unsqueeze(0)
         progress = False
         for i, score in enumerate(y_next_):
-            self.train_x.append(x_next_[i] )
+            self.train_x_keys.append(x_next_keys[i])
+            torch.concatenate((self.train_x_tensor, x_next_tensor[i]), axis=0)
             if len(self.top_k_scores) < self.k: 
                 # if we don't yet have k top scores, add it to the list
                 self.top_k_scores.append(score.item())
-                self.top_k_xs.append(x_next_[i])
+                self.top_k_xs_keys.append(x_next_keys[i])
+                self.top_k_xs_tensor.append(x_next_tensor[i])
                 self.top_k_zs.append(z_next_[i].unsqueeze(-2))
-            elif score.item() > min(self.top_k_scores) and (x_next_[i] not in self.top_k_xs):
+            elif score.item() > min(self.top_k_scores) and (x_next_keys[i] not in self.top_k_xs_keys):
                 # if the score is better than the worst score in the top k list, upate the list
                 min_score = min(self.top_k_scores)
                 min_idx = self.top_k_scores.index(min_score)
                 self.top_k_scores[min_idx] = score.item()
-                self.top_k_xs[min_idx] = x_next_[i]
+                self.top_k_xs_keys[min_idx] = x_next_keys[i]
+                self.top_k_xs_tensor[min_idx] = x_next_tensor[i]
                 self.top_k_zs[min_idx] = z_next_[i].unsqueeze(-2) # .cuda()
             #if we imporve
             if score.item() > self.best_score_seen:
                 self.progress_fails_since_last_e2e = 0
                 progress = True
                 self.best_score_seen = score.item() #update best
-                self.best_x_seen = x_next_[i]
+                self.best_x_seen = x_next_keys[i]
                 self.new_best_found = True
         if (not progress) and acquisition: # if no progress msde, increment progress fails
             self.progress_fails_since_last_e2e += 1
@@ -218,22 +226,20 @@ class LOLBOState:
         self.objective.vae.eval()
         self.model.train()
         optimizer1 = torch.optim.Adam([{'params': self.model.parameters(),'lr': self.learning_rte} ], lr=self.learning_rte)
-        new_xs = self.train_x[-self.bsz:]
-        train_x = new_xs + self.top_k_xs
-        max_string_len = len(max(train_x, key=len))
-        # max batch size smaller to avoid memory limit 
-        #   with longer strings (more tokens) 
-        bsz = max(1, int(2560/max_string_len))
-        num_batches = math.ceil(len(train_x) / bsz) 
+        new_xs = self.train_x_tensor[-self.bsz:]
+        train_x = torch.concatenate((new_xs, self.top_k_x_tensors), axis=0)
+        bsz = self.bsz
+        num_batches = math.ceil(train_x.shape[0] / bsz) 
         for _ in range(self.num_update_epochs):
             for batch_ix in range(num_batches):
                 start_idx, stop_idx = batch_ix*bsz, (batch_ix+1)*bsz
-                batch_list = train_x[start_idx:stop_idx] 
-                z, _ = self.objective.vae_forward(batch_list)
-                out_dict = self.objective(z)
+                batch_x_tensor = train_x[start_idx:stop_idx] 
+                z, _ = self.objective.vae_forward(batch_x_tensor,) # VSCK: TODO: Add graph_embeds to Lolbo_State attributes
+                out_dict = self.objective(z, start_key_idx=len(self.train_x_keys))
                 scores_arr = out_dict['scores'] 
                 valid_zs = out_dict['valid_zs']
-                selfies_list = out_dict['decoded_xs']
+                decoded_xs_tensor = out_dict['decoded_xs_tensor']
+                #labels_list = out_dict['labels_list'] # VSCK: TODO: Check the out_dict from latent_space_objective.__call__()
                 if len(scores_arr) > 0: # if some valid scores
                     scores_arr = torch.from_numpy(scores_arr)
                     if self.minimize:
@@ -246,7 +252,7 @@ class LOLBOState:
                     optimizer1.step() 
                     with torch.no_grad(): 
                         z = z.detach().cpu()
-                        self.update_next(z,scores_arr,selfies_list)
+                        self.update_next(z, scores_arr, decoded_xs_tensor)
             torch.cuda.empty_cache()
         self.model.eval() 
 
@@ -269,10 +275,10 @@ class LOLBOState:
         )
         # 2. Evaluate the batch of candidates by calling oracle
         with torch.no_grad():
-            out_dict = self.objective(z_next)
+            out_dict = self.objective(z_next, start_key_idx=len(self.train_x_keys))
             z_next = out_dict['valid_zs']
             y_next = out_dict['scores']
-            x_next = out_dict['decoded_xs']       
+            x_next = out_dict['decoded_xs_tensor']       
             if self.minimize:
                 y_next = y_next * -1
         # 3. Add new evaluated points to dataset (update_next)
