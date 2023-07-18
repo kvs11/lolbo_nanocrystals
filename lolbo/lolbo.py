@@ -15,7 +15,7 @@ class LOLBOState:
         objective,
         train_x_keys,
         train_x_tensor,
-        #graph_embeds,
+        graph_embeds,
         train_y,
         train_z,
         k=1_000,
@@ -33,7 +33,7 @@ class LOLBOState:
         self.objective          = objective         # objective with vae for particular task
         self.train_x_keys       = train_x_keys
         self.train_x_tensor     = train_x_tensor    # initial train x data
-        self.graph_embeds      = graph_embeds      # MEGNet graph embeddings to use in NanoCrystalVAE
+        self.graph_embeds       = graph_embeds      # MEGNet graph embeddings to use in NanoCrystalVAE
         self.train_y            = train_y           # initial train y data
         self.train_z            = train_z           # initial train z data
         self.minimize           = minimize          # if True we want to minimize the objective, otherwise we assume we want to maximize the objective
@@ -99,6 +99,7 @@ class LOLBOState:
         self.top_k_xs_keys = [self.train_x_keys[i] for i in top_k_idxs]
         self.top_k_xs_tensor = [self.train_x_tensor[i] for i in top_k_idxs]
         self.top_k_zs = [self.train_z[i].unsqueeze(-2) for i in top_k_idxs]
+        self.top_k_graph_embeds = [self.graph_embeds[i] for i in top_k_idxs]
 
 
     def initialize_tr_state(self):
@@ -227,14 +228,17 @@ class LOLBOState:
         self.model.train()
         optimizer1 = torch.optim.Adam([{'params': self.model.parameters(),'lr': self.learning_rte} ], lr=self.learning_rte)
         new_xs = self.train_x_tensor[-self.bsz:]
+        new_graph_embeds = self.graph_embeds[-self.bsz:]
         train_x = torch.concatenate((new_xs, self.top_k_x_tensors), axis=0)
+        train_graph_embeds = torch.concatenate((new_graph_embeds, self.top_k_graph_embeds))
         bsz = self.bsz
         num_batches = math.ceil(train_x.shape[0] / bsz) 
         for _ in range(self.num_update_epochs):
             for batch_ix in range(num_batches):
                 start_idx, stop_idx = batch_ix*bsz, (batch_ix+1)*bsz
                 batch_x_tensor = train_x[start_idx:stop_idx] 
-                z, _ = self.objective.vae_forward(batch_x_tensor,) # VSCK: TODO: Add graph_embeds to Lolbo_State attributes
+                batch_graph_embeds = train_graph_embeds[start_idx:stop_idx]
+                z, _ = self.objective.vae_forward(batch_x_tensor, batch_graph_embeds) # VSCK: TODO: Add graph_embeds to Lolbo_State attributes
                 out_dict = self.objective(z, start_key_idx=len(self.train_x_keys))
                 scores_arr = out_dict['scores'] 
                 valid_zs = out_dict['valid_zs']
