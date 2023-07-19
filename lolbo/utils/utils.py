@@ -3,7 +3,9 @@ import math
 import selfies as sf
 from torch.utils.data import TensorDataset, DataLoader
 
-
+# VSCK: TODO modify functions to include graph embeds 
+# and custom losses for encoder and decoder with 
+# different learning rate callbacks repectively
 def update_models_end_to_end(
     train_x,
     train_y_scores,

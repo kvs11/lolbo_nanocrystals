@@ -67,7 +67,8 @@ class LatentSpaceObjective:
                 print ('Place holder for structure comparator')
 
             else: # otherwise call the oracle to get score
-                score = self.query_oracle(astr_x, )
+                # Call VASP or pre-trained model (No need of graph embeddings)
+                score = self.query_oracle(astr_x,)
                 if np.logical_not(np.isnan(score)):
                     self.num_calls += 1
 
