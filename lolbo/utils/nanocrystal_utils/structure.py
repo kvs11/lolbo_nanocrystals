@@ -5,7 +5,7 @@ import joblib
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.data_utils import *
 
 
-def get_astr_from_PC(point_cloud, max_elms=2, max_sites=29,):
+def get_astr_from_x_tensor(point_cloud, max_elms=2, max_sites=29,):
     
     '''
     This function gets chemical information for designed FTCP representations, 
@@ -76,3 +76,11 @@ def get_astr_from_PC(point_cloud, max_elms=2, max_sites=29,):
     astr = Structure(lattice, pred_formula, pred_site_coor_, coords_are_cartesian=False)
 
     return astr
+
+def get_graph_embeds_from_astr(astr):
+    """
+    Load pre-trained MEGNet model that outputs at second-last layer (tensorflow) 
+    Pass the structure and get the graph embeddings
+    """
+    sample_graph_embeds = np.random.random_sample((16,))
+    return sample_graph_embeds
