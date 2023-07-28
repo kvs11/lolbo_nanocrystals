@@ -132,8 +132,7 @@ class LOLBOState:
         z_next_ = z_next_.detach().cpu() 
         y_next_ = y_next_.detach().cpu()
         x_next_tensor = x_next_tensor.detach().cpu()
-        # convert graph_embeds to tensor
-        graph_embeds_next_ = torch.tensor(graph_embeds_next_)
+        graph_embeds_next_ = graph_embeds_next_.detach().cpu()
 
         if len(y_next_.shape) > 1:
             y_next_ = y_next_.squeeze() 
@@ -142,7 +141,7 @@ class LOLBOState:
         progress = False
         for i, score in enumerate(y_next_):
             self.train_x_keys.append(x_next_keys[i])
-            torch.concatenate((self.train_x_tensor, x_next_tensor[i]), axis=0)
+            torch.cat((self.train_x_tensor, x_next_tensor[i].unsqueeze(0)), dim=0)
             if len(self.top_k_scores) < self.k: 
                 # if we don't yet have k top scores, add it to the list
                 self.top_k_scores.append(score.item())
@@ -168,12 +167,12 @@ class LOLBOState:
                 self.new_best_found = True
         if (not progress) and acquisition: # if no progress msde, increment progress fails
             self.progress_fails_since_last_e2e += 1
-        y_next_ = y_next_.unsqueeze(-1)
+
         if acquisition:
             self.tr_state = update_state(state=self.tr_state, Y_next=y_next_)
-        self.train_z = torch.cat((self.train_z, z_next_), dim=-2)
-        self.train_y = torch.cat((self.train_y, y_next_), dim=-2)
-        self.graph_embeds = torch.cat((self.graph_embeds), dim=-2)
+        self.train_z = torch.cat((self.train_z, z_next_), dim=0)
+        self.train_y = torch.cat((self.train_y, y_next_), dim=0)
+        self.graph_embeds = torch.cat((self.graph_embeds, graph_embeds_next_), dim=0)
 
         return self
 
@@ -307,6 +306,8 @@ class LOLBOState:
         # 3. Add new evaluated points to dataset (update_next)
         if len(y_next) != 0:            
             y_next = torch.from_numpy(y_next).float()
+            x_next_tensor = torch.from_numpy(x_next_tensor).float()
+            graph_embeds_next = torch.from_numpy(graph_embeds_next).float()
             self.update_next(
                 z_next,
                 y_next,
