@@ -99,7 +99,8 @@ class Optimize(object):
         self.lolbo_state = LOLBOState(
             objective=self.objective,
             train_x_keys=self.init_train_x_keys,
-            train_x=self.init_train_x_tensor,
+            train_x_tensor=self.init_train_x_tensor,
+            graph_embeds=self.init_train_graph_embeds,
             train_y=self.init_train_y,
             train_z=self.init_train_z,
             minimize=minimize,
