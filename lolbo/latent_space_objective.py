@@ -78,7 +78,7 @@ class LatentSpaceObjective:
             astr_xs.append(astr_x)
 
         scores_arr = np.array(scores)
-        decoded_xs = np.array(decoded_xs)
+        decoded_xs = np.array(decoded_xs.detach().cpu())
         # get valid zs, xs, and scores
         bool_arr = np.logical_not(np.isnan(scores_arr)) 
         decoded_xs = decoded_xs[bool_arr]

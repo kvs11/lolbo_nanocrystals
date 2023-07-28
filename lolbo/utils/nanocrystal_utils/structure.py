@@ -29,7 +29,7 @@ def get_astr_from_x_tensor(point_cloud, max_elms=2, max_sites=29,):
     ftcp_src_path = '/home/vkolluru/GenerativeModeling/FTCPcode/src'
     elm_str = joblib.load(ftcp_src_path + '/data/element.pkl')
 
-    ftcp_designs = np.expand_dims(point_cloud, axis=0)
+    ftcp_designs = np.expand_dims(point_cloud.detach().cpu(), axis=0)
     Ntotal_elms = len(elm_str)
     # Get predicted elements of designed crystals
     pred_elm = np.argmax(ftcp_designs[:, :Ntotal_elms, :max_elms], axis=1)
@@ -71,7 +71,6 @@ def get_astr_from_x_tensor(point_cloud, max_elms=2, max_sites=29,):
     pred_site_coor = pred_site_coor[:Nsites, :]
 
     lattice = Lattice.from_lengths_and_angles(pred_abc, pred_ang)
-    print (lattice, pred_formula, pred_site_coor)
     astr = Structure(lattice, pred_formula, pred_site_coor, coords_are_cartesian=False)
 
     return astr
