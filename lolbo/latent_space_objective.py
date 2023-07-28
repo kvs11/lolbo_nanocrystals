@@ -77,8 +77,8 @@ class LatentSpaceObjective:
             scores.append(score)
             astr_xs.append(astr_x)
 
-        scores_arr = np.array(scores)
-        decoded_xs = np.array(decoded_xs.detach().cpu())
+        scores_arr = np.array(scores).astype('float32')
+        decoded_xs = np.array(decoded_xs.detach().cpu()).astype('float32')
         # get valid zs, xs, and scores
         bool_arr = np.logical_not(np.isnan(scores_arr)) 
         decoded_xs = decoded_xs[bool_arr]
@@ -102,7 +102,7 @@ class LatentSpaceObjective:
                         'score': scores_arr[i]}
             self.pool_dict[key] = key_dict 
 
-        decoded_xs_graph_embeds = np.array(decoded_xs_graph_embeds)
+        decoded_xs_graph_embeds = np.array(decoded_xs_graph_embeds).astype('float32')
 
         out_dict = {}
         out_dict['scores'] = scores_arr
