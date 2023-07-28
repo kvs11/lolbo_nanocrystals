@@ -1,6 +1,6 @@
 import numpy as np
 import torch 
-from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.structure import get_astr_from_PC, get_graph_embeds_from_astr
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.structure import get_astr_from_x_tensor, get_graph_embeds_from_astr
 
 
 class LatentSpaceObjective:
@@ -51,15 +51,17 @@ class LatentSpaceObjective:
                 out_dict['decoded_xs'] = an array of valid xs obtained from input zs
                 out_dict['scores']: an array of valid scores obtained from input zs
         '''
+        # VSCK: TODO: Keep this graph embeds and structure from x_tensor parts in 
+        # NanocrystalObjective as it is more specific to the NCs
         if type(z) is np.ndarray: 
             z = torch.from_numpy(z).float()
         decoded_xs = self.vae_decode(z)
         scores = []
         astr_xs = []
-        for pc_x in decoded_xs:
+        for x_tensor in decoded_xs:
             # VSCK: First make sure that the decoded structure is not a duplicate
             # of structures present in the pool
-            astr_x = get_astr_from_PC(pc_x)
+            astr_x = get_astr_from_x_tensor(x_tensor)
             dupe_key = None
             # TODO: Check duplicates with Comparator from FANTASTX
             if dupe_key is not None:
@@ -82,21 +84,29 @@ class LatentSpaceObjective:
         decoded_xs = decoded_xs[bool_arr]
         scores_arr = scores_arr[bool_arr]
         valid_zs = z[bool_arr]
+        decoded_xs_graph_embeds = []
 
         # update pool_dict with new samples (decoded valid_zs)
+        # NOTE: VSCK: the pool_dict is in objective is doing bookkeeping.
+        # The out_dict is used to update the lolbo_state train_x/y/z on 
+        # every iteration. Both are doing the same job. Remove one of them later. 
         for i in range(len(valid_zs)):
             key = f'sample_{start_key_idx+i}'
             graph_embeds_x = get_graph_embeds_from_astr(astr_xs[i])
-            key_dict = {'PC': decoded_xs[i], 
+            decoded_xs_graph_embeds.append(graph_embeds_x)
+            key_dict = {'x_tensor': decoded_xs[i], 
                         'astr': astr_xs[i],
-                        'grph_embds': graph_embeds_x,
+                        'graph_embeds': graph_embeds_x,
                         'score': scores_arr[i]}
             self.pool_dict[key] = key_dict 
+
+        decoded_xs_graph_embeds = np.array(decoded_xs_graph_embeds)
 
         out_dict = {}
         out_dict['scores'] = scores_arr
         out_dict['valid_zs'] = valid_zs
         out_dict['decoded_xs_tensor'] = decoded_xs
+        out_dict['decoded_xs_graph_embeds'] = decoded_xs_graph_embeds
         #out_dict['decoded_xs_keys'] = decoded_keys # VSCK: The xs_keys are stored in Lolbo_State; only used in lolbo_state; So not generated in Objective
         return out_dict
 
