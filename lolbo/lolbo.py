@@ -5,7 +5,7 @@ from gpytorch.mlls import PredictiveLogLikelihood
 from lolbo_nanocrystal.lolbo.utils.bo_utils.turbo import TurboState, update_state, generate_batch
 from lolbo_nanocrystal.lolbo.utils.utils import update_models_end_to_end, update_surr_model
 from lolbo_nanocrystal.lolbo.utils.bo_utils.ppgpr import GPModelDKL
-from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.structure import get_astr_from_PC
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.structure import get_astr_from_x_tensor
 
 
 class LOLBOState:
@@ -77,14 +77,14 @@ class LOLBOState:
         Assign astr (pymatgen structure), PC array (xs), and score (ys) for each label'''
         init_pool_dict = {}
         for idx, key in enumerate(self.train_x_keys):
-            pc_x = self.train_x_tensor[idx]
-            astr_x = get_astr_from_PC(pc_x)
+            x_tensor = self.train_x_tensor[idx]
+            astr_x = get_astr_from_x_tensor(x_tensor)
             graph_embeds_x = self.graph_embeds[idx]
             score = self.train_y.squeeze()[idx].item()
             init_pool_dict[key] = {
-                'PC': pc_x,
+                'x_tensor': x_tensor,
                 'astr': astr_x,
-                'grph_embds': graph_embeds_x,
+                'graph_embeds': graph_embeds_x,
                 'score': score
             }
         self.objective.pool_dict = init_pool_dict
@@ -201,13 +201,24 @@ class LOLBOState:
     def update_models_e2e(self):
         '''Finetune VAE end to end with surrogate model'''
         self.progress_fails_since_last_e2e = 0
-        new_xs = self.train_x[-self.bsz:]
-        new_ys = self.train_y[-self.bsz:].squeeze(-1).tolist()
-        train_x = new_xs + self.top_k_xs
-        train_y = torch.tensor(new_ys + self.top_k_scores).float()
+        new_x_keys = self.train_x_keys[-self.bsz:] 
+        train_x_keys = new_x_keys + self.top_k_xs_keys
+        # Use new x_keys to get the other data
+        train_x_tensors, train_graph_embeds, train_y_tensors = [], [], []
+        for each_key in train_x_keys:
+            train_x_tensors.append(self.objective.pool_dict[each_key]['x_tensor'])
+            train_graph_embeds.append(self.objective.pool_dict[each_key]['graph_embeds'])
+            train_y_tensors.append(self.objective.pool_dict[each_key]['score'])
+
+        # convert lists to tensors
+        train_x_tensors = torch.tensor(train_x_tensors)
+        train_graph_embeds = torch.tensor(train_graph_embeds)
+        train_y_tensors = torch.tensor(train_y_tensors)
+
         self.objective, self.model = update_models_end_to_end(
-            train_x,
-            train_y,
+            train_x_tensors,
+            train_graph_embeds,
+            train_y_tensors,
             self.objective,
             self.model,
             self.mll,
@@ -282,9 +293,15 @@ class LOLBOState:
             out_dict = self.objective(z_next, start_key_idx=len(self.train_x_keys))
             z_next = out_dict['valid_zs']
             y_next = out_dict['scores']
-            x_next = out_dict['decoded_xs_tensor']       
+            x_next = out_dict['decoded_xs_tensor']
+            graph_embeds_next = out_dict['decoded_xs_graph_embeds']
             if self.minimize:
                 y_next = y_next * -1
+
+        # 2-3: update train_x/y/z in attributes with new pool dict from objective
+        # NOTE: pool_dict gets updated during objective __call__ 
+        self.update_train_xyz()
+
         # 3. Add new evaluated points to dataset (update_next)
         if len(y_next) != 0:
             y_next = torch.from_numpy(y_next).float()
@@ -298,3 +315,11 @@ class LOLBOState:
             self.progress_fails_since_last_e2e += 1
             if self.verbose:
                 print("GOT NO VALID Y_NEXT TO UPDATE DATA, RERUNNING ACQUISITOIN...")
+
+    def update_train_xyz(self):
+        """
+        Use the "current" pool_dict to update the train_x(keys/tensors) 
+        / train_y / train_z. Always make a list of "fresh keys" instead of 
+        calling from existing dict.
+        """
+        pass
