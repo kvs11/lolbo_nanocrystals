@@ -124,7 +124,7 @@ class LOLBOState:
         return self
 
 
-    def update_next(self, z_next_, y_next_, x_next_tensor, x_next_keys, acquisition=False):
+    def update_next(self, z_next_, y_next_, x_next_tensor, x_next_keys, graph_embeds_next_, acquisition=False):
         '''Add new points (z_next, y_next, x_next) to train data
             and update progress (top k scores found so far)
             and update trust region state
@@ -132,6 +132,8 @@ class LOLBOState:
         z_next_ = z_next_.detach().cpu() 
         y_next_ = y_next_.detach().cpu()
         x_next_tensor = x_next_tensor.detach().cpu()
+        # convert graph_embeds to tensor
+        graph_embeds_next_ = torch.tensor(graph_embeds_next_)
 
         if len(y_next_.shape) > 1:
             y_next_ = y_next_.squeeze() 
@@ -147,6 +149,7 @@ class LOLBOState:
                 self.top_k_xs_keys.append(x_next_keys[i])
                 self.top_k_xs_tensor.append(x_next_tensor[i])
                 self.top_k_zs.append(z_next_[i].unsqueeze(-2))
+                self.top_k_graph_embeds.append(graph_embeds_next_[i])
             elif score.item() > min(self.top_k_scores) and (x_next_keys[i] not in self.top_k_xs_keys):
                 # if the score is better than the worst score in the top k list, upate the list
                 min_score = min(self.top_k_scores)
@@ -155,6 +158,7 @@ class LOLBOState:
                 self.top_k_xs_keys[min_idx] = x_next_keys[i]
                 self.top_k_xs_tensor[min_idx] = x_next_tensor[i]
                 self.top_k_zs[min_idx] = z_next_[i].unsqueeze(-2) # .cuda()
+                self.top_k_graph_embeds[min_idx] = graph_embeds_next_[i]
             #if we imporve
             if score.item() > self.best_score_seen:
                 self.progress_fails_since_last_e2e = 0
@@ -169,6 +173,7 @@ class LOLBOState:
             self.tr_state = update_state(state=self.tr_state, Y_next=y_next_)
         self.train_z = torch.cat((self.train_z, z_next_), dim=-2)
         self.train_y = torch.cat((self.train_y, y_next_), dim=-2)
+        self.graph_embeds = torch.cat((self.graph_embeds), dim=-2)
 
         return self
 
@@ -290,36 +295,27 @@ class LOLBOState:
         )
         # 2. Evaluate the batch of candidates by calling oracle
         with torch.no_grad():
-            out_dict = self.objective(z_next, start_key_idx=len(self.train_x_keys))
+            out_dict = self.objective(z_next, last_key_idx=len(self.train_x_keys))
             z_next = out_dict['valid_zs']
             y_next = out_dict['scores']
-            x_next = out_dict['decoded_xs_tensor']
+            x_next_tensor = out_dict['decoded_xs_tensor']
+            x_next_keys = out_dict['x_next_keys']
             graph_embeds_next = out_dict['decoded_xs_graph_embeds']
             if self.minimize:
                 y_next = y_next * -1
 
-        # 2-3: update train_x/y/z in attributes with new pool dict from objective
-        # NOTE: pool_dict gets updated during objective __call__ 
-        self.update_train_xyz()
-
         # 3. Add new evaluated points to dataset (update_next)
-        if len(y_next) != 0:
+        if len(y_next) != 0:            
             y_next = torch.from_numpy(y_next).float()
             self.update_next(
                 z_next,
                 y_next,
-                x_next,
+                x_next_tensor,
+                x_next_keys,
+                graph_embeds_next,
                 acquisition=True
             )
         else:
             self.progress_fails_since_last_e2e += 1
             if self.verbose:
                 print("GOT NO VALID Y_NEXT TO UPDATE DATA, RERUNNING ACQUISITOIN...")
-
-    def update_train_xyz(self):
-        """
-        Use the "current" pool_dict to update the train_x(keys/tensors) 
-        / train_y / train_z. Always make a list of "fresh keys" instead of 
-        calling from existing dict.
-        """
-        pass

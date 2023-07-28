@@ -41,7 +41,7 @@ class LatentSpaceObjective:
         assert self.vae is not None
 
 
-    def __call__(self, z, start_key_idx):
+    def __call__(self, z, last_key_idx):
         ''' Input 
                 z: a numpy array or pytorch tensor of latent space points
                 start_key_idx: The starting integer index for the new set of sampled zs (in latent space). 
@@ -84,14 +84,16 @@ class LatentSpaceObjective:
         decoded_xs = decoded_xs[bool_arr]
         scores_arr = scores_arr[bool_arr]
         valid_zs = z[bool_arr]
-        decoded_xs_graph_embeds = []
-
+        
         # update pool_dict with new samples (decoded valid_zs)
         # NOTE: VSCK: the pool_dict is in objective is doing bookkeeping.
         # The out_dict is used to update the lolbo_state train_x/y/z on 
-        # every iteration. Both are doing the same job. Remove one of them later. 
+        # every iteration. Both are doing the same job. Remove one of them later.
+        x_next_keys = [] 
+        decoded_xs_graph_embeds = []
         for i in range(len(valid_zs)):
-            key = f'sample_{start_key_idx+i}'
+            key = f'sample_{last_key_idx+i+1}'
+            x_next_keys.append(key)
             graph_embeds_x = get_graph_embeds_from_astr(astr_xs[i])
             decoded_xs_graph_embeds.append(graph_embeds_x)
             key_dict = {'x_tensor': decoded_xs[i], 
@@ -106,6 +108,7 @@ class LatentSpaceObjective:
         out_dict['scores'] = scores_arr
         out_dict['valid_zs'] = valid_zs
         out_dict['decoded_xs_tensor'] = decoded_xs
+        out_dict['x_next_keys'] = x_next_keys
         out_dict['decoded_xs_graph_embeds'] = decoded_xs_graph_embeds
         #out_dict['decoded_xs_keys'] = decoded_keys # VSCK: The xs_keys are stored in Lolbo_State; only used in lolbo_state; So not generated in Objective
         return out_dict

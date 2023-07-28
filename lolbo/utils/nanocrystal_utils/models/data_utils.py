@@ -106,7 +106,8 @@ def load_nanocrystal_train_data():
     # zs will be computed in NanoCrystalOptimization initialize_objective. 
     zs_from_inputs = None 
 
-    input_key_names = [f'sample_{i}' for i in range(input_array.shape[0])]
+    # sample keys inds start from 1.
+    input_key_names = [f'sample_{i+1}' for i in range(input_array.shape[0])]
     return input_key_names, input_array, graph_embeds_array, zs_from_inputs, y_values_array
 
 
