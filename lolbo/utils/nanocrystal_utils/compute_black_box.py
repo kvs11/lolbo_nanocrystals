@@ -48,13 +48,13 @@ def get_y_val_from_input(input_x):
 
 
     """
-    y_val = np.random.random(0.3, 1.5)
+    y_val = np.random.uniform(0.5, 2.5)
 
     return y_val
 
 
 def run_vasp():
-    raise NotImplementedError
+    print ('Running VASP placeholder')
 
 
 def get_y_vals_from_a_predictor():

@@ -46,8 +46,8 @@ class NanoCrystalObjective(LatentSpaceObjective):
         z = z.cuda()
         self.vae = self.vae.eval()
         self.vae = self.vae.cuda()
-        # sample molecular string form VAE decoder
-        decoded_sample = self.vae.sample(z=z.reshape(-1, 2, 128))
+        # decoded Xs samples form VAE decoder
+        decoded_sample = self.vae.decoder(z)
 
         return decoded_sample
 
