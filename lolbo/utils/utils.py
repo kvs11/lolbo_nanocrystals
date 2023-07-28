@@ -1,19 +1,20 @@
 import torch
 import math
-import selfies as sf
 from torch.utils.data import TensorDataset, DataLoader
 
 # VSCK: TODO modify functions to include graph embeds 
 # and custom losses for encoder and decoder with 
 # different learning rate callbacks repectively
 def update_models_end_to_end(
-    train_x,
+    train_x_tensors,
+    train_graph_embeds,
     train_y_scores,
     objective,
     model,
     mll,
     learning_rte,
-    num_update_epochs
+    num_update_epochs,
+    bsz = 128,
 ):
     '''Finetune VAE end to end with surrogate model
     This method is build to be compatible with the 
@@ -25,14 +26,15 @@ def update_models_end_to_end(
             {'params': objective.vae.parameters()},
             {'params': model.parameters(), 'lr': learning_rte} ], lr=learning_rte)
     # max batch size smaller to avoid memory limit with longer strings (more tokens)
-    max_string_length = len(max(train_x, key=len))
-    bsz = max(1, int(2560/max_string_length)) 
-    num_batches = math.ceil(len(train_x) / bsz)
+    # max_string_length = len(max(train_x_tensors, key=len))
+    # bsz = max(1, int(2560/max_string_length)) 
+    num_batches = math.ceil(len(train_x_tensors) / bsz)
     for _ in range(num_update_epochs):
         for batch_ix in range(num_batches):
             start_idx, stop_idx = batch_ix*bsz, (batch_ix+1)*bsz
-            batch_list = train_x[start_idx:stop_idx]
-            z, vae_loss = objective.vae_forward(batch_list)
+            train_x_batch = train_x_tensors[start_idx:stop_idx]
+            graph_embeds_batch = train_graph_embeds[start_idx:stop_idx]
+            z, vae_loss = objective.vae_forward(train_x_batch, graph_embeds_batch)
             batch_y = train_y_scores[start_idx:stop_idx]
             batch_y = torch.tensor(batch_y).float() 
             pred = model(z)
