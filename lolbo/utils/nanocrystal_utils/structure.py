@@ -66,14 +66,13 @@ def get_astr_from_x_tensor(point_cloud, max_elms=2, max_sites=29,):
     # Get predicted lattice of designed crystals
     pred_abc = ftcp_designs[0, Ntotal_elms, :3]
     pred_ang = ftcp_designs[0, Ntotal_elms+1,:3]
-    pred_latt = np.concatenate((pred_abc, pred_ang))
     # Get predicted site coordinates of designed crystals
-    pred_site_coor = []
-    pred_site_coor_ = ftcp_designs[0, Ntotal_elms+2:Ntotal_elms+2+max_sites, :3]
-    pred_site_coor_ = pred_site_coor_[:Nsites, :]
+    pred_site_coor = ftcp_designs[0, Ntotal_elms+2:Ntotal_elms+2+max_sites, :3]
+    pred_site_coor = pred_site_coor[:Nsites, :]
 
-    lattice = Lattice(pred_latt)
-    astr = Structure(lattice, pred_formula, pred_site_coor_, coords_are_cartesian=False)
+    lattice = Lattice.from_lengths_and_angles(pred_abc, pred_ang)
+    print (lattice, pred_formula, pred_site_coor)
+    astr = Structure(lattice, pred_formula, pred_site_coor, coords_are_cartesian=False)
 
     return astr
 
