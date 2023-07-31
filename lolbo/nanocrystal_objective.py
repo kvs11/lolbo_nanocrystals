@@ -126,7 +126,9 @@ class NanoCrystalObjective(LatentSpaceObjective):
         dummy_ys = torch.ones_like(reg_output_)
         
         # Compute the loss and its gradients
-        loss_fn_args = [reconstructed_output_, xs_batch, mu_, log_var_, reg_output_, dummy_ys]
+        loss_fn_args = [reconstructed_output_.cuda(), xs_batch.cuda(), 
+                        mu_.cuda(), log_var_.cuda(), 
+                        reg_output_.cuda(), dummy_ys.cuda()]
         loss_fn_kwargs = {
             'coeff_recon': self.vae.hparams.coeffs[0],
             'coeff_KL': self.vae.hparams.coeffs[1], 
