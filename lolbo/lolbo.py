@@ -244,8 +244,8 @@ class LOLBOState:
         optimizer1 = torch.optim.Adam([{'params': self.model.parameters(),'lr': self.learning_rte} ], lr=self.learning_rte)
         new_xs = self.train_x_tensor[-self.bsz:]
         new_graph_embeds = self.graph_embeds[-self.bsz:]
-        train_x = torch.cat((new_xs, self.top_k_x_tensors), dim=0)
-        train_graph_embeds = torch.cat((new_graph_embeds, self.top_k_graph_embeds), dim=0)
+        train_x = torch.cat((new_xs, torch.stack(self.top_k_xs_tensor)), dim=0)
+        train_graph_embeds = torch.cat((new_graph_embeds, torch.stack(self.top_k_graph_embeds)), dim=0)
         bsz = self.bsz
         num_batches = math.ceil(train_x.shape[0] / bsz) 
         for _ in range(self.num_update_epochs):
