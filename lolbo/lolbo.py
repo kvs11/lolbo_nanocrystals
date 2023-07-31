@@ -253,14 +253,16 @@ class LOLBOState:
                 start_idx, stop_idx = batch_ix*bsz, (batch_ix+1)*bsz
                 batch_x_tensor = train_x[start_idx:stop_idx] 
                 batch_graph_embeds = train_graph_embeds[start_idx:stop_idx]
-                z, _ = self.objective.vae_forward(batch_x_tensor, batch_graph_embeds) # VSCK: TODO: Add graph_embeds to Lolbo_State attributes
-                out_dict = self.objective(z, start_key_idx=len(self.train_x_keys))
-                scores_arr = out_dict['scores'] 
+                z, _ = self.objective.vae_forward(batch_x_tensor, batch_graph_embeds)
+                out_dict = self.objective(z, last_key_idx=len(self.train_x_keys))
                 valid_zs = out_dict['valid_zs']
+                scores_arr = out_dict['scores']
                 decoded_xs_tensor = out_dict['decoded_xs_tensor']
-                #labels_list = out_dict['labels_list'] # VSCK: TODO: Check the out_dict from latent_space_objective.__call__()
+                decoded_xs_keys = out_dict['x_next_keys']
+                decoded_graph_embeds = out_dict['decoded_xs_graph_embeds']
+                
                 if len(scores_arr) > 0: # if some valid scores
-                    scores_arr = torch.from_numpy(scores_arr)
+                    scores_arr = torch.from_numpy(scores_arr).float()
                     if self.minimize:
                         scores_arr = scores_arr * -1
                     pred = self.model(valid_zs)
@@ -271,7 +273,10 @@ class LOLBOState:
                     optimizer1.step() 
                     with torch.no_grad(): 
                         z = z.detach().cpu()
-                        self.update_next(z, scores_arr, decoded_xs_tensor)
+                        decoded_xs_tensor = torch.from_numpy(decoded_xs_tensor).float()
+                        decoded_graph_embeds = torch.from_numpy(decoded_graph_embeds).float()
+                        self.update_next(z, scores_arr, decoded_xs_tensor, 
+                                         decoded_xs_keys, decoded_graph_embeds)
             torch.cuda.empty_cache()
         self.model.eval() 
 
@@ -304,7 +309,7 @@ class LOLBOState:
                 y_next = y_next * -1
 
         # 3. Add new evaluated points to dataset (update_next)
-        if len(y_next) != 0:            
+        if len(y_next) != 0:
             y_next = torch.from_numpy(y_next).float()
             x_next_tensor = torch.from_numpy(x_next_tensor).float()
             graph_embeds_next = torch.from_numpy(graph_embeds_next).float()
