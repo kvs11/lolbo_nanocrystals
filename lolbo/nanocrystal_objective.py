@@ -1,5 +1,7 @@
 import numpy as np
 import torch 
+from operator import itemgetter
+
 
 from lolbo_nanocrystal.lolbo.latent_space_objective import LatentSpaceObjective
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.IrOx_VAE import NanoCrystalVAE
@@ -112,11 +114,32 @@ class NanoCrystalObjective(LatentSpaceObjective):
         if not torch.is_tensor(graph_embds_batch):
             graph_embds_batch = list_or_np_to_tensor(graph_embds_batch)
 
-        dict_ = self.vae(xs_batch.cuda(), graph_embds_batch.cuda())
-        z = dict_['z']
-        z = z.reshape(-1,self.dim)
+        outputs_dict = self.vae(xs_batch.cuda(), graph_embds_batch.cuda())
 
-        return z
+        # Compute loss here (same as in pl training_step)
+        # NOTE: Use dummy ys that computes regression branch loss because 
+        # we don't use it. Only Recon and KLD losses are used.
+        z, mu_, log_var_, reg_output_, reconstructed_output_ = itemgetter(
+            'z', 'mu', 'log_var', 'reg_output', 'reconstructed_output')(outputs_dict)
+        
+        z = z.reshape(-1,self.dim)
+        dummy_ys = torch.ones_like(reg_output_)
+        
+        # Compute the loss and its gradients
+        loss_fn_args = [reconstructed_output_, xs_batch, mu_, log_var_, reg_output_, dummy_ys]
+        loss_fn_kwargs = {
+            'coeff_recon': self.vae.hparams.coeffs[0],
+            'coeff_KL': self.vae.hparams.coeffs[1], 
+            'coeff_reg': self.vae.hparams.coeffs[2]
+        }
+        loss_dict = NanoCrystalVAE.loss_function(*loss_fn_args, **loss_fn_kwargs)
+
+        recon_loss = loss_dict['Reconstruction_loss'] 
+        kld_loss = loss_dict['KLD_loss']
+        vae_loss = torch.mean(self.vae.hparams.coeffs[0] * recon_loss + \
+                              self.vae.hparams.coeffs[1] * kld_loss)
+        
+        return z, vae_loss
 
 
 if __name__ == "__main__":
