@@ -14,7 +14,7 @@ def update_models_end_to_end(
     mll,
     learning_rte,
     num_update_epochs,
-    bsz = 128,
+    bsz = 10,
 ):
     '''Finetune VAE end to end with surrogate model
     This method is build to be compatible with the 
