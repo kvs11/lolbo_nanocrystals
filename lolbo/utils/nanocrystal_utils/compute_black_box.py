@@ -28,7 +28,10 @@ def get_y_val_from_input(input_x):
     submit VASPjob (for debugging do a dummy job)
 
     >>>>>
-    Question: This approach to be fully-automatic, it should run like FANTASTX on dask workers; And then call Lolbo-model updates using a different set of dask-workers that use GPUs.
+    Question: This approach to be fully-automatic, 
+    it should run like FANTASTX on dask workers; 
+    And then call Lolbo-model updates using a 
+    different set of dask-workers that use GPUs.
 
     The overall workflow should be something like this - 
 
@@ -49,6 +52,12 @@ def get_y_val_from_input(input_x):
 
     """
     y_val = np.random.uniform(0.5, 2.5)
+    
+    do_lammps = False
+    #if do_lammps:
+    #    # 1. Get the POSCAR file 
+
+
 
     return y_val
 
