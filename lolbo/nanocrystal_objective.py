@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import torch 
 from operator import itemgetter
@@ -6,6 +7,7 @@ from operator import itemgetter
 from lolbo_nanocrystal.lolbo.latent_space_objective import LatentSpaceObjective
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.IrOx_VAE import NanoCrystalVAE
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.compute_black_box import get_y_val_from_astr
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.energy_fx import initialize_energy_code
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.fingerprinting import Comparator
 
 class NanoCrystalObjective(LatentSpaceObjective):
@@ -18,6 +20,7 @@ class NanoCrystalObjective(LatentSpaceObjective):
         path_to_vae_ckpt: str=None,
         fp_label: str='bag-of-bonds',
         fp_tolerances=None,
+        energy_input_yaml=None,
         pool_dict={},
         labels_count=0,
         num_calls=0,
@@ -28,6 +31,9 @@ class NanoCrystalObjective(LatentSpaceObjective):
         self.path_to_vae_ckpt = path_to_vae_ckpt
         self.fp_label = fp_label
         self.fp_tolerances = fp_tolerances
+
+        self.energy_code = initialize_energy_code.make_energy_code_object(
+                                                    energy_input_yaml, os.getcwd())
 
         super().__init__(
             num_calls=num_calls,
