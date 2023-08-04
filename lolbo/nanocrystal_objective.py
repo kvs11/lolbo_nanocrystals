@@ -5,7 +5,7 @@ from operator import itemgetter
 
 from lolbo_nanocrystal.lolbo.latent_space_objective import LatentSpaceObjective
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.IrOx_VAE import NanoCrystalVAE
-from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.compute_black_box import get_y_val_from_input
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.compute_black_box import get_y_val_from_astr
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.fingerprinting import Comparator
 
 class NanoCrystalObjective(LatentSpaceObjective):
@@ -65,7 +65,7 @@ class NanoCrystalObjective(LatentSpaceObjective):
         # method to 
         # --> convert FTCP to VASP inputs
         # Runs VASP and returns the objective function value (eg. formation energy)
-        score = get_y_val_from_input(x) 
+        score = get_y_val_from_astr(x) 
 
         return score
 
