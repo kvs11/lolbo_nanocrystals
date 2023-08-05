@@ -19,6 +19,7 @@ from pymatgen.io.vasp.inputs import Poscar
 import os
 import yaml
 import shutil
+import datetime
 import numpy as np
 import subprocess as sp
 import re
@@ -355,6 +356,20 @@ class lammps_code(object):
         astr.remove_sites(all_inds)
         for sps, coords in zip(species, fc):
             astr.append(sps, coords, coords_are_cartesian=False)
+
+    def rename_dirs(self, x_keys, valid_x_keys, new_x_keys):
+        """
+        """
+        calcs_path = self.main_path + '/calcs'
+        # Rename failed dirs to create empty space (to avoid overwriting)
+        for x_key in x_keys:
+            if x_key not in valid_x_keys:
+                os.rename(calcs_path + f'/{x_key}', calcs_path + \
+                    f'/failed_{x_key}_{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}')
+        # Now, rename valid dirs to new key names
+        for vx_key, nx_key in zip(valid_x_keys, new_x_keys):
+            os.rename(calcs_path + f'/{vx_key}', calcs_path + f'/{nx_key}')
+
 
 
 class vasp_code(object):
@@ -788,8 +803,21 @@ class vasp_code(object):
         gb_poscar = Poscar(model.astr, selective_dynamics=sd_flags)
         gb_poscar.write_file(file_name)
 
+    def rename_dirs(self, x_keys, valid_x_keys, new_x_keys):
+        """
+        """
+        calcs_path = self.main_path + '/calcs'
+        # Rename failed dirs to create empty space (to avoid overwriting)
+        for x_key in x_keys:
+            if x_key not in valid_x_keys:
+                os.rename(calcs_path + f'/{x_key}', calcs_path + \
+                    f'/failed_{x_key}_{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}')
+        # Now, rename valid dirs to new key names
+        for vx_key, nx_key in zip(valid_x_keys, new_x_keys):
+            os.rename(calcs_path + f'/{vx_key}', calcs_path + f'/{nx_key}')
 
-class initilize_energy_code:
+
+class initialize_energy_code:
     """
     Class includes functions/routine from fx19/inputs.py
     """
