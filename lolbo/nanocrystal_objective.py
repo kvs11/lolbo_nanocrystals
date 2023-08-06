@@ -71,7 +71,7 @@ class NanoCrystalObjective(LatentSpaceObjective):
         # method to 
         # --> convert FTCP to VASP inputs
         # Runs VASP and returns the objective function value (eg. formation energy)
-        score = get_y_val_from_astr(x) 
+        score = get_y_val_from_astr(x, self.energy_code) 
 
         return score
 
