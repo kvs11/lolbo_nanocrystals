@@ -26,6 +26,7 @@ import re
 
 DEBUG = False
 
+# TODO: Create an energy_code base class for vasp_code and lammps_code
 
 class lammps_code(object):
 
@@ -72,7 +73,7 @@ class lammps_code(object):
         if 'atom_style' in energy_params:
             self.atom_style = energy_params['atom_style']
 
-    def prep_job_folder(self, model, reg_id):
+    def prep_job_folder(self, astr, astr_label):
         """
         Function to:
 
@@ -89,36 +90,21 @@ class lammps_code(object):
              bookkeeping
         """
         main_path = self.main_path
-        # create folders for model and relaxation
-        # ProcessPoolExecutor has multiple parallel processes make models
-        # at same time. So, reg_id is not up to date always.
-        while True:
-            if not model.inheritance == 'from_file':
-                try:
-                    model_path = main_path + '/calcs/' + str(model.label)
-                    os.mkdir(model_path)
-                except FileExistsError:
-                    model.label = reg_id.create_id()
-                    continue
-                else:
-                    break
-            else:
-                model_path = main_path + '/calcs/' + str(model.label)
-                os.mkdir(model_path)
-                break
+        model_path = main_path + '/calcs/' + str(astr_label)
+        os.mkdir(model_path)
 
-        relax_path = main_path + '/calcs/' + str(model.label) + '/relax'
+        relax_path = main_path + '/calcs/' + str(astr_label) + '/relax'
         os.mkdir(relax_path)
-        self.relax_path = relax_path
-        model.relax_path = relax_path
-        astr = model.astr
+        
+        #model.relax_path = relax_path
+
         files_path = self.energy_files_path
         atom_style = self.atom_style
         # write model structure to POSCAR and store it in /relax
         new_poscar = relax_path + '/POSCAR_unrelaxed'
         sd_flags = [[0, 0, 0] for i in range(len(astr))]
-        gb_poscar = Poscar(astr, selective_dynamics=sd_flags)
-        gb_poscar.write_file(new_poscar)
+        astr_poscar = Poscar(astr, selective_dynamics=sd_flags)
+        astr_poscar.write_file(new_poscar)
         # check if both files exist.
         file_list = os.listdir(files_path)
         # For LAMMPS: check for in.min file in the files_path
@@ -141,7 +127,7 @@ class lammps_code(object):
 
         # returns nothing
 
-    def relax(self, model, reg_id):
+    def get_score(self, astr, astr_label):
         """
         Starts the lammps relaxation in the calcs/<model label> path. Assigns
         the evaluated total energy and obj0_val to model attributes.
@@ -154,18 +140,16 @@ class lammps_code(object):
             reg_id (obj): `structure_record.register_id()` object for
              bookkeeping
         """
-        print(f"Prepping the job folder of model {model.label}.")
+        print(f"Prepping the job folder of model {astr_label}.")
         # prepare the folder to start energy calc
-        self.prep_job_folder(model, reg_id)
+        self.prep_job_folder(astr, astr_label)
         # start the lammps calculation
-        relax_path = model.relax_path
-        print(f"Model {model.label} relax path is: {relax_path}")
-        # relax_path = model.relax_path
+        relax_path = self.main_path + '/calcs/' + str(astr_label) + '/relax'
+
         # os.chdir(relax_path)
         lammps_exec = self.energy_exec_cmd.split()
         with open(
-            relax_path + '/log_lammps.{}'.format(model.label), 'w'
-        )as log_file:
+            relax_path + '/log_lammps.{}'.format(astr_label), 'w') as log_file:
             lammps_job = sp.Popen(
                 lammps_exec, stdout=sp.PIPE, stderr=sp.STDOUT, cwd=relax_path)
             for each_line in lammps_job.stdout:
@@ -176,57 +160,46 @@ class lammps_code(object):
 
         # save total energy to model attributes
         total_energy = None
-        with open(f'{relax_path}/log_lammps.{model.label}', 'r') as log:
-            lines = log.readlines()
-            string = 'Step Temp E_pair E_mol TotEng Press'
-            for i, line in enumerate(lines):
-                if string in line:
-                    total_energy = float(lines[i+2].split()[4])
+        match = None
+        pattern = re.compile("Energy initial, next-to-last, final")
+        lines = open(f'{relax_path}/log_lammps.{astr_label}',
+                        'r').read().splitlines()
+        for line in lines:
+            if match is not None:
+                total_energy = float(line.split()[2])
+            match = re.search(pattern, line)
 
         if not total_energy:
             print('Model {} energy not found in log_lammps.{} file'.format(
-                model.label, model.label))
+                astr_label, astr_label))
             print('LAMMPS relaxation on model {} NOT successful'.format(
-                model.label))
+                astr_label))
             # quit()
-        else:
-            model.tot_en = total_energy
-            # For lammps, assume always converged after relaxation
-            model.converged = True
-            # get objective value from energy and save to attributes
-            # NOTE: objective function for cluster is assumed to be epa
-            # NOTE: objective function for gb - ?????
 
-            # Make sure to 'dump' relaxed structure to 'rlx.str' file in in.min
-            # get symbols of elements as a list
-            astr = model.astr
-            symbols = []
-            for i in astr.species:
-                if i.symbol not in symbols:
-                    symbols.append(i.symbol)
-            relaxed_astr = self.get_relaxed_cell(
-                f'{relax_path}/rlx.str', f'{relax_path}/in.data', symbols)
-            # save relaxed structure in model.astr and to poscar
-            POSCAR_relaxed = relax_path + '/POSCAR_relaxed'
-            relaxed_astr.sort()
-            self.move_atoms_inside(relaxed_astr)
-            relaxed_astr.to(filename=POSCAR_relaxed, fmt='poscar')
-            model.astr = relaxed_astr
-            # NOTE: Do not overwrite model.astr as it could be used in Xsim(s)
-            # Save the grain boundary as a model attribute
-            comp_dict = relaxed_astr.composition.as_dict()
-            astr_elems = [i.name for i in relaxed_astr.composition.elements]
+        symbols = []
+        for i in astr.species:
+            if i.symbol not in symbols:
+                symbols.append(i.symbol)
+        relaxed_astr = self.get_relaxed_cell(
+            f'{relax_path}/rlx.str', f'{relax_path}/in.data', symbols)
+        # save relaxed structure in model.astr and to poscar
+        POSCAR_relaxed = relax_path + '/POSCAR_relaxed'
+        relaxed_astr.sort()
+        self.move_atoms_inside(relaxed_astr)
+        relaxed_astr.to(filename=POSCAR_relaxed, fmt='poscar')
+        
+        comp_dict = relaxed_astr.composition.as_dict()
+        astr_elems = [i.name for i in relaxed_astr.composition.elements]
 
-            # DU
-            free_en = total_energy
-            for elem in astr_elems:
-                if elem in self.sym_mu_dict.keys():
-                    free_en -= comp_dict[elem]*self.sym_mu_dict[elem]
-                else:
-                    print("Error. LAMMPS species " + elem +
-                          " not contained in input yaml file.")
-            model.obj0_val = float(free_en)
-
+        # DU
+        free_en = total_energy
+        for elem in astr_elems:
+            if elem in self.sym_mu_dict.keys():
+                free_en -= comp_dict[elem]*self.sym_mu_dict[elem]
+            else:
+                print("Error. LAMMPS species " + elem +
+                        " not contained in input yaml file.")
+                
         # Following are done in relax:
         # save relaxed_structure - done in do_relaxation
         # relaxed_structure is now the structure of the model
@@ -234,6 +207,8 @@ class lammps_code(object):
         # (energy, gamma etc)
         # checks if relaxation is successful; gives error message and do not go
         # ahead with the structure (goes back and creates new strucutre)
+        
+        return free_en
 
     def get_relaxed_cell(self, rlx_astr, data_in_path, element_symbols):
         """
@@ -817,116 +792,112 @@ class vasp_code(object):
             os.rename(calcs_path + f'/{vx_key}', calcs_path + f'/{nx_key}')
 
 
-class initialize_energy_code:
+
+def get_energy_params(i_dict):
     """
-    Class includes functions/routine from fx19/inputs.py
+    Determines all the parameters, mandatory and optional, to be
+    used to make energy object for each calculation.
+
+    Arguments:
+
+        i_dict (dict): dictionary of all the user-provided input parameters
+        read from yaml file
+
+    Returns:
+
+        dict: all the determined parameters
     """
+    energy_params = {}
+    # add main_path, i.e., where the search started to energy_params
+    energy_params['main_path'] = i_dict['main_path']
+
+    # energy_code
+    if 'energy_code' not in i_dict:
+        print('Please provide energy code details. This is mandatory')
+    else:
+        energy_params['energy_code'] = i_dict['energy_code']
+
+    # energy code execution command (Mandatory)
+    if 'energy_exec_cmd' not in i_dict:
+        print('Please provide the execution command for the energy '
+            'code. This is mandatory. Ex: \"lmp_mpi -in in.min\"')
+    else:
+        energy_params['energy_exec_cmd'] = i_dict['energy_exec_cmd']
+
+    # DU
+    # chemical potentials
+    species_dict = i_dict['species']
+    mu = {}
+    for species in species_dict.keys():
+        index = int(species[7:])
+        if 'mu' in species_dict[species].keys():
+            mu[index] = species_dict[species]['mu']
+        else:
+            print('Error encountered with species ' + str(index) + ': '
+                'Chemical potentials must be provided in the dictionary'
+                + ' for each species!')
+            mu[index] = 0
+
+    energy_params['mu'] = mu
+
+    # Number of times to resubmit if not converged (for vasp)
+    energy_params['resubmit'] = 0
+    if energy_params['energy_code'] == 'vasp':
+        if 'resubmit' in i_dict:
+            energy_params['resubmit'] = i_dict['resubmit']
+
+    # any specific energy code parameters like atom_style etc
+    if 'energy_code_params' in i_dict:
+        energy_code_params = i_dict['energy_code_params']
+        energy_code_keys = list(energy_code_params.keys())
+        for key in energy_code_keys:
+            energy_params[key] = energy_code_params[key]
+
+    # files_path
+    if 'energy_files_path' not in i_dict:
+        print('Please provide path to folder with input energy files for'
+            ' relaxation.')
+    else:
+        energy_params['files_path'] = i_dict['energy_files_path']
+
+    energy_params['shape'] = i_dict['shape']
+    energy_params['element_syms'] = i_dict['element_syms']
+
+    return energy_params
+
+def make_energy_code_object(yaml_file, main_path):
+    """
+    """
+    main_path = os.getcwd()
+    # read input file and make input dictionary
+    with open(yaml_file) as ifile:
+        i_dict = yaml.load(ifile, Loader=yaml.FullLoader)
+        i_dict['main_path'] = main_path
+
+    # make energy_code object
+    energy_params = initialize_energy_code.get_energy_params(i_dict)
+
+    energy_pkg = i_dict['energy_code']  # 'vasp' or 'lammps'
+    if energy_pkg == 'vasp':
+        energy_code = vasp_code(energy_params)
+    elif energy_pkg == 'lammps':
+        energy_code = lammps_code(energy_params)
+    else:
+        print('Please set energy_code in inputs as one of vasp'
+            'or lammps only')
+    print(f"Energy code: {energy_pkg}")
     
-    def get_energy_params(i_dict):
-        """
-        Determines all the parameters, mandatory and optional, to be
-        used to make energy object for each calculation.
 
-        Arguments:
+    if energy_params['shape'] == 'gb' and 'shape_params' in i_dict:
+        energy_code.hollow_botz = i_dict['shape_params']['hollow_botz']
+        energy_code.hollow_topz = i_dict['shape_params']['hollow_topz']
+        return energy_code
 
-            i_dict (dict): dictionary of all the user-provided input parameters
-            read from yaml file
-
-        Returns:
-
-            dict: all the determined parameters
-        """
-        energy_params = {}
-        # add main_path, i.e., where the search started to energy_params
-        energy_params['main_path'] = i_dict['main_path']
-
-        # energy_code
-        if 'energy_code' not in i_dict:
-            print('Please provide energy code details. This is mandatory')
-        else:
-            energy_params['energy_code'] = i_dict['energy_code']
-
-        # energy code execution command (Mandatory)
-        if 'energy_exec_cmd' not in i_dict:
-            print('Please provide the execution command for the energy '
-                'code. This is mandatory. Ex: \"lmp_mpi -in in.min\"')
-        else:
-            energy_params['energy_exec_cmd'] = i_dict['energy_exec_cmd']
-
-        # DU
-        # chemical potentials
-        species_dict = i_dict['species']
-        mu = {}
-        for species in species_dict.keys():
-            index = int(species[7:])
-            if 'mu' in species_dict[species].keys():
-                mu[index] = species_dict[species]['mu']
-            else:
-                print('Error encountered with species ' + str(index) + ': '
-                    'Chemical potentials must be provided in the dictionary'
-                    + ' for each species!')
-                mu[index] = 0
-
-        energy_params['mu'] = mu
-
-        # Number of times to resubmit if not converged (for vasp)
-        energy_params['resubmit'] = 0
-        if energy_params['energy_code'] == 'vasp':
-            if 'resubmit' in i_dict:
-                energy_params['resubmit'] = i_dict['resubmit']
-
-        # any specific energy code parameters like atom_style etc
-        if 'energy_code_params' in i_dict:
-            energy_code_params = i_dict['energy_code_params']
-            energy_code_keys = list(energy_code_params.keys())
-            for key in energy_code_keys:
-                energy_params[key] = energy_code_params[key]
-
-        # files_path
-        if 'energy_files_path' not in i_dict:
-            print('Please provide path to folder with input energy files for'
-                ' relaxation.')
-        else:
-            energy_params['files_path'] = i_dict['energy_files_path']
-
-        energy_params['shape'] = i_dict['shape']
-        energy_params['element_syms'] = i_dict['element_syms']
-
-        return energy_params
-
-    def make_energy_code_object(yaml_file, main_path):
-        """
-        """
-        main_path = os.getcwd()
-        # read input file and make input dictionary
-        with open(yaml_file) as ifile:
-            i_dict = yaml.load(ifile, Loader=yaml.FullLoader)
-            i_dict['main_path'] = main_path
-
-        # make energy_code object
-        energy_params = initilize_energy_code.get_energy_params(i_dict)
-
-        energy_pkg = i_dict['energy_code']  # 'vasp' or 'lammps'
-        if energy_pkg == 'vasp':
-            energy_code = vasp_code(energy_params)
-        elif energy_pkg == 'lammps':
-            energy_code = lammps_code(energy_params)
-        else:
-            print('Please set energy_code in inputs as one of vasp'
-                'or lammps only')
-        print(f"Energy code: {energy_pkg}")
-        
-
-        if energy_params['shape'] == 'gb' and 'shape_params' in i_dict:
-            energy_code.hollow_botz = i_dict['shape_params']['hollow_botz']
-            energy_code.hollow_topz = i_dict['shape_params']['hollow_topz']
-            return energy_code
-
-        if energy_params['shape'] == 'surface' and 'shape_params' in i_dict:
-            energy_code.substrate_thickness = i_dict['shape_params']['substrate_thickness']
-            energy_code.sd_cut_off = i_dict['shape_params']['sd_cut_off']
-            energy_code.sd_no_z = i_dict['shape_params']['sd_no_z']
-            return energy_code
-        
+    if energy_params['shape'] == 'surface' and 'shape_params' in i_dict:
+        energy_code.substrate_thickness = i_dict['shape_params']['substrate_thickness']
+        energy_code.sd_cut_off = i_dict['shape_params']['sd_cut_off']
+        energy_code.sd_no_z = i_dict['shape_params']['sd_no_z']
         return energy_code
     
+    return energy_code
+
