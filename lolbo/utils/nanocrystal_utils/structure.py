@@ -3,7 +3,7 @@ import numpy as np
 import joblib
 
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.data_utils import *
-
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.megnet import generate_megnet_embedding
 
 def get_astr_from_x_tensor(point_cloud, max_elms=2, max_sites=29,):
     
@@ -80,5 +80,7 @@ def get_graph_embeds_from_astr(astr):
     Load pre-trained MEGNet model that outputs at second-last layer (tensorflow) 
     Pass the structure and get the graph embeddings
     """
-    sample_graph_embeds = np.random.random_sample((16,))
-    return sample_graph_embeds
+    graph_embedding = generate_megnet_embedding([astr])[0]
+    # sample_graph_embeds = np.random.random_sample((16,))
+
+    return graph_embedding
