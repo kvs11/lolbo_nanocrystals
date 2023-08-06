@@ -207,7 +207,7 @@ class lammps_code(object):
         # (energy, gamma etc)
         # checks if relaxation is successful; gives error message and do not go
         # ahead with the structure (goes back and creates new strucutre)
-        
+
         return free_en
 
     def get_relaxed_cell(self, rlx_astr, data_in_path, element_symbols):
@@ -231,8 +231,16 @@ class lammps_code(object):
         """
 
         # read the dump.atom file as a list of strings
-        with open(rlx_astr, 'r') as atom_dump:
-            lines = atom_dump.readlines()
+        with open(rlx_astr) as f:
+            dat_lines = f.readlines()
+
+        dat_lines.reverse()
+        lines = []
+        for l in dat_lines:
+            lines.append(l)
+            if "ITEM: TIMESTEP" in l:
+                break
+        lines.reverse()
 
         # get the lattice vectors
         a_data = lines[5].split()
@@ -875,7 +883,7 @@ def make_energy_code_object(yaml_file, main_path):
         i_dict['main_path'] = main_path
 
     # make energy_code object
-    energy_params = initialize_energy_code.get_energy_params(i_dict)
+    energy_params = get_energy_params(i_dict)
 
     energy_pkg = i_dict['energy_code']  # 'vasp' or 'lammps'
     if energy_pkg == 'vasp':
