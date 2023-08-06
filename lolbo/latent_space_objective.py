@@ -16,7 +16,8 @@ class LatentSpaceObjective:
         pool_dict={},
         labels_count=0,
         num_calls=0,
-        task_id=''
+        task_id='',
+        energy_code=None,
         ):
 
         # Initialize a comparator class with the pool of all existing structures
@@ -34,6 +35,8 @@ class LatentSpaceObjective:
         # string id for optimization task, often used by oracle
         #   to differentiate between similar tasks (ie for guacamol)
         self.task_id = task_id
+
+        self.energy_code = energy_code
 
         # load in pretrained VAE, store in variable self.vae
         self.vae = None
@@ -56,9 +59,10 @@ class LatentSpaceObjective:
         if type(z) is np.ndarray: 
             z = torch.from_numpy(z).float()
         decoded_xs = self.vae_decode(z)
+        x_keys = [f'sample_{last_key_idx+i+1}' for i in range(decoded_xs.shape[0])]
         scores = []
         astr_xs = []
-        for x_tensor in decoded_xs:
+        for ind, x_tensor in enumerate(decoded_xs):
             # VSCK: First make sure that the decoded structure is not a duplicate
             # of structures present in the pool
             astr_x = get_astr_from_x_tensor(x_tensor)
@@ -70,7 +74,7 @@ class LatentSpaceObjective:
 
             else: # otherwise call the oracle to get score
                 # Call VASP or pre-trained model (No need of graph embeddings)
-                score = self.query_oracle(astr_x,)
+                score = self.query_oracle(astr_x, x_keys[ind])
                 if np.logical_not(np.isnan(score)):
                     self.num_calls += 1
 
@@ -84,6 +88,10 @@ class LatentSpaceObjective:
         decoded_xs = decoded_xs[bool_arr]
         scores_arr = scores_arr[bool_arr]
         valid_zs = z[bool_arr]
+
+        valid_x_keys = x_keys[bool_arr]
+        new_x_keys = [f'sample_{last_key_idx+i+1}' for i in range(len(valid_x_keys))]
+        self.energy_code.rename_dirs(x_keys, valid_x_keys, new_x_keys)
         
         # update pool_dict with new samples (decoded valid_zs)
         # NOTE: VSCK: the pool_dict is in objective is doing bookkeeping.
