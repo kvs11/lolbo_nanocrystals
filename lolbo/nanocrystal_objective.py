@@ -7,7 +7,7 @@ from operator import itemgetter
 from lolbo_nanocrystal.lolbo.latent_space_objective import LatentSpaceObjective
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.IrOx_VAE import NanoCrystalVAE
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.compute_black_box import get_y_val_from_astr
-from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.energy_fx import initialize_energy_code
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.energy_fx import make_energy_code_object
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.fingerprinting import Comparator
 
 class NanoCrystalObjective(LatentSpaceObjective):
@@ -32,13 +32,13 @@ class NanoCrystalObjective(LatentSpaceObjective):
         self.fp_label = fp_label
         self.fp_tolerances = fp_tolerances
 
-        self.energy_code = initialize_energy_code.make_energy_code_object(
-                                                    energy_input_yaml, os.getcwd())
+        self.energy_code = make_energy_code_object(energy_input_yaml, os.getcwd())
 
         super().__init__(
             num_calls=num_calls,
             pool_dict=pool_dict,
             labels_count=labels_count,
+            energy_code=self.energy_code,
         )
 
 
@@ -60,7 +60,7 @@ class NanoCrystalObjective(LatentSpaceObjective):
         return decoded_sample
 
 
-    def query_oracle(self, x):
+    def query_oracle(self, astr_x, astr_label):
         ''' Input: 
                 a single input space item x
             Output:
@@ -71,7 +71,8 @@ class NanoCrystalObjective(LatentSpaceObjective):
         # method to 
         # --> convert FTCP to VASP inputs
         # Runs VASP and returns the objective function value (eg. formation energy)
-        score = get_y_val_from_astr(x, self.energy_code) 
+        score = self.energy_code.get_score(astr_x, astr_label)
+        #score = get_y_val_from_astr(astr_x, astr_label, self.energy_code)
 
         return score
 
