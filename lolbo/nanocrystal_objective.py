@@ -2,13 +2,16 @@ import os
 import numpy as np
 import torch 
 from operator import itemgetter
+from collections import OrderedDict
 
+import matgl
 
 from lolbo_nanocrystal.lolbo.latent_space_objective import LatentSpaceObjective
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.IrOx_VAE import NanoCrystalVAE
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.compute_black_box import get_y_val_from_astr
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.energy_fx import make_energy_code_object
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.fingerprinting import Comparator
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.megnet_torch import MEGNetShortModel
 
 class NanoCrystalObjective(LatentSpaceObjective):
     '''MoleculeObjective class supports all molecule optimization
@@ -98,6 +101,25 @@ class NanoCrystalObjective(LatentSpaceObjective):
             For dev purposes, fingerprinting.py is copied from fantastx entirely. 
             (Currently using bag-of-bonds with respective thresholds) '''
         self.comparator = Comparator(label=self.fp_label, tolerances=self.fp_tolerances)
+
+    def initialize_megnet_short_model(self, pre_trained_matgl_model):
+        """
+        Given the name of a pre-trained matgl model, this function creates another 
+        model with same weights to provide the second last layer embeddings
+        """
+        megnet_model = matgl.load_model(pre_trained_matgl_model)
+        megnet_short_model = MEGNetShortModel()
+
+        megnet_sd = megnet_model.model.state_dict()
+        short_model_keys = megnet_short_model.state_dict().keys()
+
+        megnet_sd_for_short_model = OrderedDict()
+        for key in short_model_keys:
+            megnet_sd_for_short_model[key] = megnet_sd[key]
+
+        megnet_short_model.load_state_dict(megnet_sd_for_short_model)
+
+        self.megnet_short_model = megnet_short_model
 
     def vae_forward(self, xs_batch, graph_embds_batch):
         ''' Input: 

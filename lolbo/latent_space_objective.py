@@ -18,6 +18,7 @@ class LatentSpaceObjective:
         num_calls=0,
         task_id='',
         energy_code=None,
+        pre_trained_matgl_model='MEGNet-MP-2018.6.1-Eform',
         ):
 
         # Initialize a comparator class with the pool of all existing structures
@@ -41,7 +42,10 @@ class LatentSpaceObjective:
         # load in pretrained VAE, store in variable self.vae
         self.vae = None
         self.initialize_vae()
+        self.megnet_short_model = None
+        self.initialize_megnet_short_model(pre_trained_matgl_model)
         assert self.vae is not None
+        assert self.megnet_short_model is not None
 
 
     def __call__(self, z, last_key_idx):
@@ -102,7 +106,9 @@ class LatentSpaceObjective:
         for i in range(len(valid_zs)):
             key = f'sample_{last_key_idx+i+1}'
             x_next_keys.append(key)
-            graph_embeds_x = get_graph_embeds_from_astr(astr_xs[i])
+            # graph_embeds_x = get_graph_embeds_from_astr(astr_xs[i])
+            graph_embeds_x = self.megnet_short_model.predict_structure(astr_xs[i])
+            graph_embeds_x = graph_embeds_x.detach().cpu()
             decoded_xs_graph_embeds.append(graph_embeds_x)
             key_dict = {'x_tensor': decoded_xs[i], 
                         'astr': astr_xs[i],
@@ -151,6 +157,19 @@ class LatentSpaceObjective:
         ''' Sets variable self.comparator to the Comparator class with appropriate parameters 
         Currently using bag-of-bonds with respective thresholds. '''
         raise NotImplementedError("Must implement method initialize_comparator() with bag-of-bonds comparator")
+
+    def initialize_megnet_short_model(self, pre_trained_matgl_model):
+        '''    Loads the pre-trained MEGNet model initializes the Short model 
+    
+        Matgl pre-trained models as of August 2023: 
+
+        'M3GNet-MP-2018.6.1-Eform', 
+        'M3GNet-MP-2021.2.8-DIRECT-PES', 
+        'M3GNet-MP-2021.2.8-PES', 
+        'MEGNet-MP-2018.6.1-Eform', 
+        'MEGNet-MP-2019.4.1-BandGap-mfi'  '''
+        raise NotImplementedError("Must implement method initialize_megnet_short_model() with one of matgl megnet models")
+
 
     def vae_forward(self, xs_batch):
         ''' Input: 
