@@ -398,7 +398,8 @@ class NanoCrystalVAE(pl.LightningModule):
 
         return [optimizer], [dict(scheduler=lr_scheduler, interval='step', frequency=1)]
 
-
+    def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
+        scheduler.step()
 
 def fit(coeffs=(1, 2, 10,), max_epochs=250, batch_size=64,  
         print_metrics=True, checkpath=None):
