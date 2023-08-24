@@ -52,6 +52,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from pymatgen.core.structure import Structure, Lattice
 
 import lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.distance_check as dc
+#import fx19.distance_check as dc
 
 def cutoff(dist, dist_cut):
     if dist < dist_cut:
