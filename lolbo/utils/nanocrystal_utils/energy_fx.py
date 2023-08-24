@@ -317,6 +317,7 @@ class lammps_code(object):
             if "ITEM: TIMESTEP" in l:
                 break
         last_traj_lines.reverse()
+        dat_lines.reverse()
         relaxed_lattice, relaxed_cart_coords, types = \
                     get_relaxed_lattice_and_cart_coords(last_traj_lines)
 
@@ -325,23 +326,24 @@ class lammps_code(object):
         for atom_type in types:
             relaxed_symbols.append(types_symbols[atom_type])
 
-        if last_only:
-            last_astr = Structure(relaxed_lattice, relaxed_symbols, 
+        last_astr = Structure(relaxed_lattice, relaxed_symbols, 
                             relaxed_cart_coords, coords_are_cartesian=True)
+        if last_only:
             return last_astr
         
-        all_traj_astrs, traj_inds = [last_astr], [last_traj_lines[1]]
+        all_traj_astrs, traj_inds = [last_astr], [int(last_traj_lines[1])]
         
         # get all other intermediate steps
         nl_per_traj = len(last_traj_lines)
-        for ii in range(len(dat_lines)/nl_per_traj):
+        total_trajs = int(len(dat_lines)/nl_per_traj)
+        for ii in range(total_trajs-1):
             traj_lines = dat_lines[nl_per_traj*ii:nl_per_traj*(ii+1)]
-            traj_ind = traj_lines[1]
+            traj_ind = int(traj_lines[1])
             relaxed_lattice, relaxed_cart_coords, _ = \
                     get_relaxed_lattice_and_cart_coords(last_traj_lines)
 
             traj_astr = Structure(relaxed_lattice, relaxed_symbols, 
-                            relaxed_cart_coords, oords_are_cartesian=True)
+                            relaxed_cart_coords, coords_are_cartesian=True)
             all_traj_astrs.append(traj_astr)
             traj_inds.append(traj_ind)
 
@@ -366,6 +368,43 @@ class lammps_code(object):
         astr.remove_sites(all_inds)
         for sps, coords in zip(species, fc):
             astr.append(sps, coords, coords_are_cartesian=False)
+
+    @staticmethod
+    def get_step_energies(log_lammps_path, step_inds):
+        """
+        Given a list of integers that are step indices in a lammps relaxation,
+        this method reads the log.lammps file and returns a list of 
+        total energies corresponding to the step indices.
+
+        Arguments:
+        
+        log_lammps (str): path to the log.lammps file
+
+        step_inds (list): list of integers or strings of the step indices
+        """
+        with open(log_lammps_path) as f:
+            log_lines = f.readlines()
+
+        log_step_lines = []
+        for i, l in enumerate(log_lines):
+            if 'Step TotEng Volume' in l:
+                ii =  i
+            if 'Loop time of' in l:
+                jj = i
+                step_lines = log_lines[ii+1:jj]
+                log_step_lines += step_lines
+        
+        all_steps, all_tot_ens = [], []
+        for step_line in log_step_lines:
+            assert len(log_lines[ii].split()) == len(step_line.split())
+            all_steps.append(step_line.split()[0])
+            all_tot_ens.append(float(step_line.split()[1]))
+
+        step_tot_ens = []
+        for ind in step_inds:
+            step_tot_ens.append(all_tot_ens[all_steps.index(str(ind))])
+
+        return step_tot_ens
 
     def rename_dirs(self, x_keys, valid_x_keys, new_x_keys):
         """
