@@ -238,29 +238,27 @@ class MEGNetShortModel(nn.Module, IOMixIn):
         return self(g, g.edata["edge_attr"], g.ndata["node_type"], state_feats).detach()
 
 
-pre_trained_matgl_model = "MEGNet-MP-2018.6.1-Eform"
-megnet_model = matgl.load_model(pre_trained_matgl_model)
-megnet_short_model = MEGNetShortModel()
+#########
 
-megnet_sd = megnet_model.model.state_dict()
-short_model_keys = megnet_short_model.state_dict().keys()
+if "__name__" == "__main__":
+    # Get dataset info and get embeddings
+    dataset_path = ""
+    dataset_json = "" 
+    save_embeds_name = "matgl_megnet_embeds.npy" 
 
-megnet_sd_for_short_model = OrderedDict()
-for key in short_model_keys:
-    megnet_sd_for_short_model[key] = megnet_sd[key]
+    pre_trained_matgl_model = "MEGNet-MP-2018.6.1-Eform"
+    megnet_model = matgl.load_model(pre_trained_matgl_model)
+    megnet_short_model = MEGNetShortModel()
 
-megnet_short_model.load_state_dict(megnet_sd_for_short_model)
+    megnet_sd = megnet_model.model.state_dict()
+    short_model_keys = megnet_short_model.state_dict().keys()
 
-# Now get the poscars/structures for the L1, L2, L3 and test datasets
-# Get dataset info and get embeddings
-for i in [2, 3]:
-    dataset_path = f'/home/vkolluru/GenerativeModeling/New_IrO2_datasets/combined_dataset_wo_duplicates/all_structures_level{i}'
-    dataset_json = f'/home/vkolluru/GenerativeModeling/New_IrO2_datasets/combined_dataset_wo_duplicates/data_level{i}.json'
-    save_embeds_name = f'L{i}_matgl_megnet_embeds.npy'
+    megnet_sd_for_short_model = OrderedDict()
+    for key in short_model_keys:
+        megnet_sd_for_short_model[key] = megnet_sd[key]
 
-    #dataset_path = f'/home/vkolluru/GenerativeModeling/New_IrO2_datasets/combined_dataset_wo_duplicates/test_set'
-    #dataset_json = f'/home/vkolluru/GenerativeModeling/New_IrO2_datasets/combined_dataset_wo_duplicates/data_test_set.json'
-    #save_embeds_name = f'Testset_matgl_megnet_embeds.npy'
+    megnet_short_model.load_state_dict(megnet_sd_for_short_model)
+
 
     # Represent poscars 
     with open(dataset_json) as f:
