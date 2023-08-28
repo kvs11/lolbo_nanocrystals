@@ -17,6 +17,7 @@ def get_PC_and_Y_arrays(
         y_keyword="",
         max_elms="",
         max_sites="",
+        zero_pad_rows=0,
         return_Nsites=True,
         save_all=False,
         src_path=None,
@@ -103,6 +104,16 @@ def get_PC_and_Y_arrays(
         # Concatenate all matrix sets to create PointCloud representation
         PC = np.concatenate((ELM, LATT, SITE_COOR, SITE_OCCU), axis=0)
 
+        if zero_pad_rows > 0:
+            if zero_pad_rows%2 == 0:
+                top_pad = bot_pad = zero_pad_rows / 2
+            if zero_pad_rows%2 == 1:
+                top_pad = int(zero_pad_rows/2)
+                bot_pad = top_pad + 1
+            top_zeros = np.zeros((top_pad, max(max_elms, 3)))
+            bot_zeros = np.zeros((bot_pad, max(max_elms, 3)))
+            PC = np.concatenate((top_zeros, PC, bot_zeros), axis=0)
+                
         PC_array.append(PC)
 
         # Get the y_value for this Poscar from data dict
@@ -144,6 +155,10 @@ if "__name__" == "__main__":
     return_Nsites = False                       
     src_path = '/home/vkolluru/GenerativeModeling/FTCPcode/src' 
     save_all = False 
+    zero_pad_rows = 3                           # For the NC-VAE to work seemlessly, we 
+                                                # need to make sure out input representation 
+                                                # remains such that it remains consistent with 
+                                                # convolutions and deconvolutions
 
     get_PC_and_Y_arrays(
         dataset_poscars_path=dataset_path,
