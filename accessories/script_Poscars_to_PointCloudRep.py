@@ -104,6 +104,7 @@ def get_PC_and_Y_arrays(
         # Concatenate all matrix sets to create PointCloud representation
         PC = np.concatenate((ELM, LATT, SITE_COOR, SITE_OCCU), axis=0)
 
+        # TODO: Automatically determine zero_pad_rows ()= PC.shape[0] %4)
         if zero_pad_rows > 0:
             if zero_pad_rows%2 == 0:
                 top_pad = bot_pad = zero_pad_rows / 2
@@ -166,6 +167,7 @@ if "__name__" == "__main__":
         y_keyword=y_keyword,
         max_elms=max_elms,
         max_sites=max_sites,
+        zero_pad_rows=zero_pad_rows,
         return_Nsites=return_Nsites,
         save_all=save_all,
         src_path=src_path,
