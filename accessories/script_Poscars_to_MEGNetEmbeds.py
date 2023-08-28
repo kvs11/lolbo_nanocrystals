@@ -242,8 +242,8 @@ class MEGNetShortModel(nn.Module, IOMixIn):
 
 if "__name__" == "__main__":
     # Get dataset info and get embeddings
-    dataset_path = ""
-    dataset_json = "" 
+    dataset_path = "test_set_poscars"
+    dataset_json = "test_set_as_json.json" 
     save_embeds_name = "matgl_megnet_embeds.npy" 
 
     pre_trained_matgl_model = "MEGNet-MP-2018.6.1-Eform"

@@ -9,16 +9,6 @@ from tqdm import tqdm
 from pymatgen.core.structure import Structure
 from sklearn.preprocessing import OneHotEncoder
 
-
-# Variable input parameters needed for this script
-dataset_path = ""       # path to the dataset_poscars
-data_file_path = ""      # data values file (as_dict.npy or .json) path 
-max_elms = 3
-max_sites = 20 
-return_Nsites = False
-src_path = None
-save_all = False 
-
 # TODO: Use custom method to get OneHot ELM matrix
 
 def get_PC_and_Y_arrays(
@@ -143,3 +133,25 @@ def read_data_file(data_file_path, key):
     and returns a list/array of the keyword values from the data file
     """
     pass
+
+if "__name__" == "__main__":
+    # Variable input parameters needed for this script
+    dataset_path = "test_set_poscars"           # path to the dataset_poscars
+    data_file_path = "test_set_as_json.json"    # data values file (as_dict.npy or .json) path 
+    y_keyword = "total_energy"                  # 'total_energy' or 'formation_energy'
+    max_elms = 2                                # Cd and Te
+    max_sites = 20                              # Max. no. atoms in any structure
+    return_Nsites = False                       
+    src_path = '/home/vkolluru/GenerativeModeling/FTCPcode/src' 
+    save_all = False 
+
+    get_PC_and_Y_arrays(
+        dataset_poscars_path=dataset_path,
+        data_file_path=data_file_path,
+        y_keyword=y_keyword,
+        max_elms=max_elms,
+        max_sites=max_sites,
+        return_Nsites=return_Nsites,
+        save_all=save_all,
+        src_path=src_path,
+    )
