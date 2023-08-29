@@ -1,14 +1,10 @@
-import torch
-import selfies as sf
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, Dataset
-import torch.nn.functional as F
-from pathlib import Path
 
-from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.data_utils import minmax
 from sklearn.preprocessing import MinMaxScaler
 import numpy as np
 
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.data_utils import minmax
 
 class IrOx_Dataset(Dataset):
     def __init__(self, 
