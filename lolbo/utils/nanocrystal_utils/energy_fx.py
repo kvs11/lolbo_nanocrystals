@@ -329,7 +329,7 @@ class lammps_code(object):
         last_astr = Structure(relaxed_lattice, relaxed_symbols, 
                             relaxed_cart_coords, coords_are_cartesian=True)
         if last_only:
-            return last_astr
+            return last_astr, None
         
         all_traj_astrs, traj_inds = [last_astr], [int(last_traj_lines[1])]
         
@@ -340,7 +340,7 @@ class lammps_code(object):
             traj_lines = dat_lines[nl_per_traj*ii:nl_per_traj*(ii+1)]
             traj_ind = int(traj_lines[1])
             relaxed_lattice, relaxed_cart_coords, _ = \
-                    get_relaxed_lattice_and_cart_coords(last_traj_lines)
+                    get_relaxed_lattice_and_cart_coords(traj_lines)
 
             traj_astr = Structure(relaxed_lattice, relaxed_symbols, 
                             relaxed_cart_coords, coords_are_cartesian=True)
@@ -370,7 +370,7 @@ class lammps_code(object):
             astr.append(sps, coords, coords_are_cartesian=False)
 
     @staticmethod
-    def get_step_energies(log_lammps_path, step_inds):
+    def get_step_energies(log_lammps_path, step_inds=None):
         """
         Given a list of integers that are step indices in a lammps relaxation,
         this method reads the log.lammps file and returns a list of 
@@ -399,6 +399,9 @@ class lammps_code(object):
             assert len(log_lines[ii].split()) == len(step_line.split())
             all_steps.append(step_line.split()[0])
             all_tot_ens.append(float(step_line.split()[1]))
+
+        if step_inds is None:
+            return [all_tot_ens[-1]]
 
         step_tot_ens = []
         for ind in step_inds:
