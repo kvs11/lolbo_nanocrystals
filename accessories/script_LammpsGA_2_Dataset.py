@@ -82,10 +82,10 @@ for i_dir in all_model_dirs:
     log_lammps_path = f'{calcs_dir_path}/{i_dir}/relax/log.lammps'
     
     astrs, step_inds = lammps_code.get_relaxed_cell(
-        rlx_astr_path, data_in_path, element_symbols, last_only=False)
+        rlx_astr_path, data_in_path, element_symbols, last_only=True)
     step_tot_ens = lammps_code.get_step_energies(log_lammps_path, step_inds)
 
-    all_astrs += astrs
+    all_astrs += [astrs]
     all_tot_ens += step_tot_ens
 
 # Delete duplicate or redundant structures 
@@ -107,6 +107,7 @@ for i, astr in enumerate(all_astrs):
         uniq_models.append(model_i)
 
 uniq_tot_ens = [all_tot_ens[i] for i in uniq_astr_inds]
+print ("Total unique structures: ", len(uniq_tot_ens))
 
 # Do the test train split
 train_astrs, test_astrs, train_totens, test_totens = train_test_split(
@@ -126,9 +127,9 @@ for set_type in ['train', 'test']:
         pos_dict['comp_dict'] = astr.composition.as_dict()
         pos_dict['total_atoms'] = int(sum(pos_dict['comp_dict'].values()))
         pos_dict['epa'] = toten / pos_dict['total_atoms']
-        pos_dict['formation_energy'] = form_en_func(toten, 
-                                                    pos_dict['comp_dict']['Cd'],
-                                                    pos_dict['comp_dict']['Te'])
+        #pos_dict['formation_energy'] = form_en_func(toten, 
+        #                                            pos_dict['comp_dict']['Cd'],
+        #                                            pos_dict['comp_dict']['Te'])
         full_data[pos_key] = pos_dict
 
         # save poscars
@@ -139,4 +140,5 @@ for set_type in ['train', 'test']:
         if save_data_as_json:
             with open(f'{dataset_dir}/{set_type}_set_as_json.json', 'w') as f:
                 json.dump(full_data, f, indent=4)
+
 
