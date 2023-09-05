@@ -328,11 +328,12 @@ class lammps_code(object):
 
         last_astr = Structure(relaxed_lattice, relaxed_symbols, 
                             relaxed_cart_coords, coords_are_cartesian=True)
-        if last_only:
-            return last_astr, None
         
         all_traj_astrs, traj_inds = [last_astr], [int(last_traj_lines[1])]
         
+        if last_only:
+            return all_traj_astrs, None
+                
         # get all other intermediate steps
         nl_per_traj = len(last_traj_lines)
         total_trajs = int(len(dat_lines)/nl_per_traj)
