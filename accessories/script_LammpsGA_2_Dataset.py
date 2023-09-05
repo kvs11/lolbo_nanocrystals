@@ -14,13 +14,16 @@ from fx19 import structure_record
 
 
 # variables to be given as input
-element_symbols = ['Cd', 'Te']  # all elements present in the system
-fp_label = 'bag-of-bonds'       # fingerprinting mode
+element_symbols = ['Cd', 'Te']                    # all elements present in the system
+fp_label = 'bag-of-bonds'                   # fingerprinting mode
 fp_tolerances = {fp_label: [0.04, 0.7]}     # tolerances for the fingerprinting mode
-calcs_dir_path = '/sandbox/vkolluru/Gen_models_for_FANTASTX/CdTe_test_case/Fantastx_GA_rand30/calcs'             # path to calcs dir
-dump_file_name = 'rlx.str'      # dump file name
-test_set_size = 0.2             # float or int
-dataset_dir = '/sandbox/vkolluru/Gen_models_for_FANTASTX/CdTe_test_case/Fantastx_GA_rand30/dataset_from_calcs'                # path to create dataset dir
+main_path = '/sandbox/vkolluru/Gen_models_for_FANTASTX/test_cases/CdTe_sw/FX_2000'
+calcs_dir_path = main_path + '/calcs'       # path to calcs dir
+max_n_for_vae = 500                         # use first 500 candidate lammps relaxations 
+dump_file_name = 'rlx.str'                  # dump file name
+test_set_size = 0.2                         # float or int
+dataset_dir = main_path + '/dataset_from_calcs'           # path to create dataset dir
+last_only = False                           # True to collect only final relaxed structures
 save_data_as_dict = True 
 save_data_as_json = True
 
@@ -71,8 +74,14 @@ os.mkdir(dataset_dir+'/train_set_poscars')#, exist_ok=True)
 os.mkdir(dataset_dir+'/test_set_poscars')#, exist_ok=True)
 
 # Go to calcs dir and get all model dirs
-all_model_dirs = [i_dir for i_dir in os.listdir(calcs_dir_path) \
-                  if os.path.isdir(calcs_dir_path+f'/{i_dir}')]
+if max_n_for_vae is not None:
+    with open(main_path + '/data_file') as f:
+        lines = f.readlines()
+        lines = lines[2:]
+    all_model_dirs = [l.split()[0] for l in lines[:max_n_for_vae]]
+else:
+    all_model_dirs = [i_dir for i_dir in os.listdir(calcs_dir_path) \
+                    if os.path.isdir(calcs_dir_path+f'/{i_dir}')]
 
 all_astrs, all_tot_ens = [], []
 
@@ -82,11 +91,17 @@ for i_dir in all_model_dirs:
     log_lammps_path = f'{calcs_dir_path}/{i_dir}/relax/log.lammps'
     
     astrs, step_inds = lammps_code.get_relaxed_cell(
-        rlx_astr_path, data_in_path, element_symbols, last_only=True)
+        rlx_astr_path, data_in_path, element_symbols, last_only=last_only)
     step_tot_ens = lammps_code.get_step_energies(log_lammps_path, step_inds)
 
-    all_astrs += [astrs]
+    all_astrs += astrs
     all_tot_ens += step_tot_ens
+
+# Shuffle all_astrs and all_tot_ens to avoid favoring initial steps within 
+# each relaxation during duplicate detection in next step.
+temp_all = list(zip(all_astrs, all_tot_ens))
+random.shuffle(temp_all)
+all_astrs, all_tot_ens = zip(*temp_all)
 
 # Delete duplicate or redundant structures 
 reg_id = structure_record.register_id()
@@ -107,7 +122,10 @@ for i, astr in enumerate(all_astrs):
         uniq_models.append(model_i)
 
 uniq_tot_ens = [all_tot_ens[i] for i in uniq_astr_inds]
-print ("Total unique structures: ", len(uniq_tot_ens))
+print ("Total structures: {}\n\
+       fp tolerances: {}\n\
+       Unique structures: {}".format(
+                        len(all_astrs), fp_tolerances, len(uniq_tot_ens)))
 
 # Do the test train split
 train_astrs, test_astrs, train_totens, test_totens = train_test_split(
@@ -141,4 +159,10 @@ for set_type in ['train', 'test']:
             with open(f'{dataset_dir}/{set_type}_set_as_json.json', 'w') as f:
                 json.dump(full_data, f, indent=4)
 
-
+with open(dataset_dir+ '/params_of_dataset.txt', 'w') as f:
+    par_lines = [f"fp_label = {fp_label}\n",
+                 f"fp_tolerances = {fp_tolerances}\n",
+                 f"max_n_for_vae = {max_n_for_vae}\n",
+                 f"test_set_size = {test_set_size}\n",
+                 f"last_only = {last_only}\n"]
+    f.writelines(par_lines)
