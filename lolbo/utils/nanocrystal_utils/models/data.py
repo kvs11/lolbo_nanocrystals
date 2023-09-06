@@ -10,7 +10,7 @@ class IrOx_Dataset(Dataset):
     def __init__(self, 
             input_array_path, 
             y_values_array_path, 
-            graph_embeds_array_path, 
+            graph_embeds_array_path=None, 
             transform_xs=True, 
             transform_ys=True, 
             input_scaler=None,
@@ -18,7 +18,11 @@ class IrOx_Dataset(Dataset):
             swap_input_axes=True):
         self.input_array = np.load(input_array_path, allow_pickle=True).astype('float32')
         self.y_values_array = np.load(y_values_array_path, allow_pickle=True).astype('float32')
-        self.graph_embeds_array = np.load(graph_embeds_array_path, allow_pickle=True).astype('float32')
+
+        self.graph_embeds_array = None
+        if graph_embeds_array_path is not None:
+            self.graph_embeds_array = np.load(graph_embeds_array_path, 
+                                          allow_pickle=True).astype('float32')
 
         # By default, we use Minmax scaler only
         if transform_xs:
@@ -43,10 +47,13 @@ class IrOx_Dataset(Dataset):
 
     def __getitem__(self, idx):
         input_x = self.input_array[idx]
-        target_y = self.y_values_array[idx] 
-        embed_x = self.graph_embeds_array[idx]
-
-        return (input_x, embed_x), target_y
+        target_y = self.y_values_array[idx]
+        
+        if self.graph_embeds_array is None:
+            return (input_x, np.array([])), target_y
+        else:
+            embed_x = self.graph_embeds_array[idx]
+            return (input_x, embed_x), target_y
 
 
 class IrOxDataModule(pl.LightningDataModule):
