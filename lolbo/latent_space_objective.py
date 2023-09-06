@@ -1,6 +1,6 @@
 import numpy as np
 import torch 
-from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.structure import get_astr_from_x_tensor, get_graph_embeds_from_astr
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.structure import get_astr_from_x_tensor
 
 
 class LatentSpaceObjective:

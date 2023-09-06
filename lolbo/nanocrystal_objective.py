@@ -23,7 +23,7 @@ class NanoCrystalObjective(LatentSpaceObjective):
         path_to_vae_ckpt: str=None,
         fp_label: str='bag-of-bonds',
         fp_tolerances=None,
-        energy_input_yaml=None,
+        path_to_energy_yaml=None,
         pool_dict={},
         labels_count=0,
         num_calls=0,
@@ -35,7 +35,7 @@ class NanoCrystalObjective(LatentSpaceObjective):
         self.fp_label = fp_label
         self.fp_tolerances = fp_tolerances
 
-        self.energy_code = make_energy_code_object(energy_input_yaml, os.getcwd())
+        self.energy_code = make_energy_code_object(path_to_energy_yaml, os.getcwd())
 
         super().__init__(
             num_calls=num_calls,
