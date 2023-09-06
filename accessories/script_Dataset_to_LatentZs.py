@@ -28,12 +28,14 @@ def get_latent_Zs(nc_vae_params, input_x_path, input_graph_embds_path, bsz,
 
     # Load inputs and graph embeds
     input_x = np.load(input_x_path, allow_pickle=True).astype('float32')
-    input_graph_embds = np.load(input_graph_embds_path, 
-                                allow_pickle=True).astype('float32')
-    
     input_x = torch.tensor(input_x)
-    input_graph_embds = torch.tensor(input_graph_embds)
 
+    input_graph_embds = np.array([[]] * input_x.shape[0]).astype('float32')
+    if input_graph_embds_path is not None:
+        input_graph_embds = np.load(input_graph_embds_path, 
+                                allow_pickle=True).astype('float32')
+    input_graph_embds = torch.tensor(input_graph_embds)
+    
     # Do the inference in batches even though the total size is smaller. 
     # Because this way is easily scalable. 
     n_batches = math.ceil(len(input_x)/bsz)
@@ -61,7 +63,7 @@ if __name__ == "__main__":
         input_dim = 148,
         channel_dim = 3,
         regression_dim = 1,
-        graph_embds_dim = 16,
+        graph_embds_dim = 0,
         latent_dim = 32,
         max_filters = 128,
         filter_size = [5, 3, 3],
@@ -70,7 +72,7 @@ if __name__ == "__main__":
     )
 
     input_x_path = train_PC_array_path
-    input_graph_embds_path = train_embds_path
+    input_graph_embds_path = None #train_embds_path
     bsz = 64
     path_to_vae_ckpt = "/sandbox/vkolluru/Gen_models_for_FANTASTX/CdTe_test_case/Fantastx_GA_rand30/dataset_from_calcs/NCVAE_model_train/lightning_logs/NanoCrystalVAE/version_3/checkpoints/last.ckpt"
     path_to_vae_statedict = None
