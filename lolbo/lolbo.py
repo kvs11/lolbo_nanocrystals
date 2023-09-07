@@ -78,7 +78,7 @@ class LOLBOState:
         init_pool_dict = {}
         for idx, key in enumerate(self.train_x_keys):
             x_tensor = self.train_x_tensor[idx]
-            astr_x = get_astr_from_x_tensor(x_tensor)
+            astr_x = get_astr_from_x_tensor(x_tensor, self.objective.vae_params)
             graph_embeds_x = self.graph_embeds[idx]
             score = self.train_y.squeeze()[idx].item()
             init_pool_dict[key] = {
@@ -124,7 +124,8 @@ class LOLBOState:
         return self
 
 
-    def update_next(self, z_next_, y_next_, x_next_tensor, x_next_keys, graph_embeds_next_, acquisition=False):
+    def update_next(self, z_next_, y_next_, x_next_tensor, x_next_keys, 
+                    graph_embeds_next_, acquisition=False):
         '''Add new points (z_next, y_next, x_next) to train data
             and update progress (top k scores found so far)
             and update trust region state
@@ -171,7 +172,7 @@ class LOLBOState:
         if acquisition:
             self.tr_state = update_state(state=self.tr_state, Y_next=y_next_)
         self.train_z = torch.cat((self.train_z, z_next_), dim=0)
-        self.train_y = torch.cat((self.train_y, y_next_), dim=0)
+        self.train_y = torch.cat((self.train_y, y_next_.unsqueeze(dim=1)), dim=0)
         self.graph_embeds = torch.cat((self.graph_embeds, graph_embeds_next_), dim=0)
 
         return self

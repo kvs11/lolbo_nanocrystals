@@ -4,7 +4,7 @@ import joblib
 
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.data_utils import *
 
-def get_astr_from_x_tensor(point_cloud, max_elms=2, max_sites=29,):
+def get_astr_from_x_tensor(point_cloud, nc_vae_params):
     
     '''
     This function gets chemical information for designed FTCP representations, 
@@ -24,11 +24,25 @@ def get_astr_from_x_tensor(point_cloud, max_elms=2, max_sites=29,):
         The default is 20.
     
     '''
+    max_elms = nc_vae_params.max_elms
+    max_sites = nc_vae_params.max_sites
+    zero_pad_rows = nc_vae_params.zero_pad_rows
+
+    # Check if there are zero padding for the x_tensor (PC_array)
+    if zero_pad_rows > 0:
+        if zero_pad_rows%2 == 0:
+            top_pad = bot_pad = zero_pad_rows / 2
+        if zero_pad_rows%2 == 1:
+            top_pad = int(zero_pad_rows/2)
+            bot_pad = top_pad + 1
+        
+        point_cloud = point_cloud[top_pad:-bot_pad]
+
     # (from FTCP src) Get the elements_string list 
     ftcp_src_path = '/home/vkolluru/GenerativeModeling/FTCPcode/src'
     elm_str = joblib.load(ftcp_src_path + '/data/element.pkl')
 
-    ftcp_designs = np.expand_dims(point_cloud.detach().cpu(), axis=0)
+    ftcp_designs = np.expand_dims(point_cloud, axis=0)
     Ntotal_elms = len(elm_str)
     # Get predicted elements of designed crystals
     pred_elm = np.argmax(ftcp_designs[:, :Ntotal_elms, :max_elms], axis=1)
@@ -55,7 +69,11 @@ def get_astr_from_x_tensor(point_cloud, max_elms=2, max_sites=29,):
                 pred_formula.append([elm_str[0]])
             else:
                 temp = pred_for_array[i]
-                temp = temp[:np.where(temp>0)[0][-1]+1]
+                #temp = temp[:np.where(temp>0)[0][-1]+1]
+                # VSCK: Previously, last non-zero is considered as limit. But it is 
+                # giving zeros in the middle of occupancy matrix. 
+                # So, use first zero as the limit instead
+                temp = temp[:np.where(temp==0)[0][0]]
                 temp = temp.tolist()
                 pred_formula.append([elm_str[int(j)] for j in temp])
         return pred_formula
@@ -69,7 +87,7 @@ def get_astr_from_x_tensor(point_cloud, max_elms=2, max_sites=29,):
     pred_site_coor = ftcp_designs[0, Ntotal_elms+2:Ntotal_elms+2+max_sites, :3]
     pred_site_coor = pred_site_coor[:Nsites, :]
 
-    lattice = Lattice.from_lengths_and_angles(pred_abc, pred_ang)
+    lattice = Lattice.from_parameters(*pred_abc, *pred_ang)
     astr = Structure(lattice, pred_formula, pred_site_coor, coords_are_cartesian=False)
 
     return astr

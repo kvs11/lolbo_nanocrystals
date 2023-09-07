@@ -109,8 +109,9 @@ class EncoderAndRegressor(nn.Module):
         result = self.encoder_conv_layers(input)
         result = torch.flatten(result, start_dim=1)
 
-        # concatenate the respective graph embedds to each flattened tensor
-        result = torch.cat((result, graph_embeds), dim=1)
+        if graph_embeds.shape[-1] != 0:
+            # concatenate the respective graph embedds to each flattened tensor
+            result = torch.cat((result, graph_embeds), dim=1)
         result = self.encoder_final_2(result)
         mu = self.fc_mu_2(result)
         log_var = self.fc_var_2(result)
@@ -274,11 +275,11 @@ class NanoCrystalVAE(pl.LightningModule):
         :param current_device: (Int) Device to run the model
         :return: (Tensor)
         """
-        z = torch.randn(num_samples, self.latent_dim)
+        z = torch.randn(num_samples, self.hparams.latent_dim)
 
         #z = z.to(current_device)
 
-        samples = self.decode(z)
+        samples = self.decoder(z)
         return samples
     
     def forward(self, inputs: Tensor, graph_embeds: Tensor):
