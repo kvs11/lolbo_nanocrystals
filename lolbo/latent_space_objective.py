@@ -17,6 +17,8 @@ class LatentSpaceObjective:
         labels_count=0,
         num_calls=0,
         task_id='',
+        scaler_X=None,
+        scaler_Y=None,
         energy_code=None,
         pre_trained_matgl_model='MEGNet-MP-2018.6.1-Eform',
         ):
@@ -36,6 +38,9 @@ class LatentSpaceObjective:
         # string id for optimization task, often used by oracle
         #   to differentiate between similar tasks (ie for guacamol)
         self.task_id = task_id
+
+        self.scaler_X = scaler_X 
+        self.scaler_Y = scaler_Y
 
         self.energy_code = energy_code
 
@@ -69,7 +74,7 @@ class LatentSpaceObjective:
         for ind, x_tensor in enumerate(decoded_xs):
             # VSCK: First make sure that the decoded structure is not a duplicate
             # of structures present in the pool
-            astr_x = get_astr_from_x_tensor(x_tensor)
+            astr_x = get_astr_from_x_tensor(x_tensor, self.scaler_X)
             dupe_key = None
             # TODO: Check duplicates with Comparator from FANTASTX
             if dupe_key is not None:

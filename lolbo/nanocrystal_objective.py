@@ -3,6 +3,7 @@ import numpy as np
 import torch 
 from operator import itemgetter
 from collections import OrderedDict
+from typing import List, Callable, Union, Any, TypeVar, Tuple
 
 import matgl
 
@@ -21,6 +22,9 @@ class NanoCrystalObjective(LatentSpaceObjective):
         self,
         path_to_vae_statedict: str=None,
         path_to_vae_ckpt: str=None,
+        nc_vae_params=None,
+        scaler_X=None,
+        scaler_Y=None,
         fp_label: str='bag-of-bonds',
         fp_tolerances=None,
         path_to_energy_yaml=None,
@@ -29,9 +33,12 @@ class NanoCrystalObjective(LatentSpaceObjective):
         num_calls=0,
     ):
 
-        self.dim                    = 32 # NanoCrystal VAE DEFAULT LATENT SPACE DIM
+        self.vae_latent_dim                    = 32 # NanoCrystal VAE default latent dim
         self.path_to_vae_statedict  = path_to_vae_statedict # path to trained vae stat dict
         self.path_to_vae_ckpt = path_to_vae_ckpt
+        self.vae_params = nc_vae_params
+        #self.scaler_X = scaler_X
+        #self.scaler_Y = scaler_Y
         self.fp_label = fp_label
         self.fp_tolerances = fp_tolerances
 
@@ -41,6 +48,8 @@ class NanoCrystalObjective(LatentSpaceObjective):
             num_calls=num_calls,
             pool_dict=pool_dict,
             labels_count=labels_count,
+            scaler_X=scaler_X,
+            scaler_Y=scaler_Y,
             energy_code=self.energy_code,
         )
 
@@ -84,7 +93,17 @@ class NanoCrystalObjective(LatentSpaceObjective):
         ''' Sets self.vae to the desired pretrained vae and 
             sets self.dataobj to the corresponding data class 
             used to tokenize inputs, etc. '''
-        self.vae = NanoCrystalVAE()
+        self.vae = NanoCrystalVAE(
+                        input_dim=self.vae_params.input_dim,
+                        channel_dim=self.vae_params.channel_dim,
+                        regression_dim=self.vae_params.regression_dim,
+                        graph_embds_dim=self.vae_params.graph_embds_dim,
+                        coeffs=self.vae_params.coeffs,
+                        latent_dim=self.vae_params.latent_dim,
+                        max_filters=self.vae_params.max_filters,
+                        filter_size=self.vae_params.filter_size,
+                        strides=self.vae_params.strides,
+                    )
         # load in state dict of trained model:
         if self.path_to_vae_ckpt:
             checkpoint = torch.load(self.path_to_vae_ckpt) 
@@ -151,7 +170,7 @@ class NanoCrystalObjective(LatentSpaceObjective):
         z, mu_, log_var_, reg_output_, reconstructed_output_ = itemgetter(
             'z', 'mu', 'log_var', 'reg_output', 'reconstructed_output')(outputs_dict)
         
-        z = z.reshape(-1,self.dim)
+        z = z.reshape(-1,self.vae_latent_dim)
         dummy_ys = torch.ones_like(reg_output_)
         
         # Compute the loss and its gradients
@@ -171,6 +190,40 @@ class NanoCrystalObjective(LatentSpaceObjective):
                               self.vae.hparams.coeffs[1] * kld_loss)
         
         return z, vae_loss
+
+
+class NC_VAE_params:
+
+    def __init__(self, vae_params_dict):
+
+        self.input_dim: int = 164
+        self.channel_dim: int = 3 
+        self.regression_dim: int = 1
+        self.graph_embds_dim: int = 16
+        self.coeffs: Tuple = (1, 2, 10,)
+        self.latent_dim: int = 32
+        self.max_filters: int = 128
+        self.filter_size: List = [5, 3, 3]
+        self.strides: List = [2, 2, 1]
+
+        if 'input_dim' in vae_params_dict:
+            self.input_dim = vae_params_dict['input_dim']
+        if 'channel_dim' in vae_params_dict:
+            self.channel_dim = vae_params_dict['channel_dim']
+        if 'regression_dim' in vae_params_dict:
+            self.regression_dim = vae_params_dict['regression_dim']
+        if 'graph_embds_dim' in vae_params_dict:
+            self.graph_embds_dim = vae_params_dict['graph_embds_dim']
+        if 'coeffs' in vae_params_dict:
+            self.coeffs = vae_params_dict['coeffs']
+        if 'latent_dim' in vae_params_dict:
+            self.latent_dim = vae_params_dict['latent_dim']
+        if 'max_filters' in vae_params_dict:
+            self.max_filters = vae_params_dict['max_filters']
+        if 'filter_size' in vae_params_dict:
+            self.filter_size = vae_params_dict['filter_size']
+        if 'strides' in vae_params_dict:
+            self.strides = vae_params_dict['strides']
 
 
 if __name__ == "__main__":
