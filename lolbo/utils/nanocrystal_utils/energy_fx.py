@@ -180,8 +180,9 @@ class lammps_code(object):
         for i in astr.species:
             if i.symbol not in symbols:
                 symbols.append(i.symbol)
-        relaxed_astr = lammps_code.get_relaxed_cell(
+        relaxed_astr, _ = lammps_code.get_relaxed_cell(
             f'{relax_path}/rlx.str', f'{relax_path}/in.data', symbols)
+        relaxed_astr = relaxed_astr[0]
         # save relaxed structure in model.astr and to poscar
         POSCAR_relaxed = relax_path + '/POSCAR_relaxed'
         relaxed_astr.sort()

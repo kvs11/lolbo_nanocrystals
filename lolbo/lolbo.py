@@ -78,7 +78,7 @@ class LOLBOState:
         init_pool_dict = {}
         for idx, key in enumerate(self.train_x_keys):
             x_tensor = self.train_x_tensor[idx]
-            astr_x = get_astr_from_x_tensor(x_tensor)
+            astr_x = get_astr_from_x_tensor(x_tensor, self.objective.vae_params)
             graph_embeds_x = self.graph_embeds[idx]
             score = self.train_y.squeeze()[idx].item()
             init_pool_dict[key] = {
