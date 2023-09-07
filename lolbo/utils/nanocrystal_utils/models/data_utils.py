@@ -90,17 +90,22 @@ def MAE_site_coor(SITE_COOR, SITE_COOR_recon, Nsites):
 
 ########################## Data Loading Helper Functions ##########################
 
-def load_nanocrystal_train_data(): 
-    path_prefix = '/home/vkolluru/GenerativeModeling/Datasets_164x3'
-    inp_arr_path = path_prefix + '/L1_Xs.npy'
-    y_vals_path = path_prefix + '/L1_Ys.npy'
-    embds_path = path_prefix + '/L1_grph_embds.npy'
+def load_nanocrystal_train_data(inp_arr_path, y_vals_path, embds_path): 
 
     # NOTE: LOLBO requires that inputs be list; y_vals & zs be a tensor
-    input_array = torch.from_numpy(np.load(inp_arr_path, allow_pickle=True).astype('float32'))
+    input_array = np.load(inp_arr_path, allow_pickle=True).astype('float32')
     graph_embeds_array = torch.from_numpy(np.load(embds_path, allow_pickle=True).astype('float32'))
-    y_values_array = torch.from_numpy(np.load(y_vals_path, allow_pickle=True).astype('float32'))
+    y_values_array = np.load(y_vals_path, allow_pickle=True).astype('float32')
 
+    # Scale x_tensor, y_tensor same as in data.Dataset class
+    input_array, input_scaler = minmax(input_array)
+
+    target_scaler = MinMaxScaler()
+    y_values_array = target_scaler.fit_transform(y_values_array.reshape(-1, 1))
+
+    input_array = torch.from_numpy(input_array)
+    y_values_array = torch.from_numpy(y_values_array)
+    
     # Always compute train_zs from the VAE instead of loading pre-computed 
     # because its consistent when changing different VAE models
     # zs will be computed in NanoCrystalOptimization initialize_objective. 
@@ -108,7 +113,8 @@ def load_nanocrystal_train_data():
 
     # sample keys inds start from 1.
     input_key_names = [f'sample_{i+1}' for i in range(input_array.shape[0])]
-    return input_key_names, input_array, graph_embeds_array, zs_from_inputs, y_values_array
+    return (input_key_names, input_array, graph_embeds_array, zs_from_inputs, 
+            y_values_array, input_scaler, target_scaler)
 
 
 def compute_train_zs(
