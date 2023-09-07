@@ -82,13 +82,20 @@ class LatentSpaceObjective:
             # VSCK: First make sure that the decoded structure is not a duplicate
             # of structures present in the pool
             astr_x = get_astr_from_x_tensor(x_descaled, self.vae_params)
+            duplicate = False
             dupe_key = None
             # TODO: Check duplicates with Comparator from FANTASTX
             if dupe_key is not None:
                 score = self.pool_dict[dupe_key]['score']
                 print ('Place holder for structure comparator')
 
-            else: # otherwise call the oracle to get score
+            invalid_astr = False
+            given_syms = list(self.energy_code.sym_mu_dict.keys())
+            curr_syms = list(astr_x.composition.as_dict().keys())
+            if not all(sym in given_syms for sym in curr_syms): 
+                invalid_astr = True
+
+            if not duplicate and not invalid_astr: # otherwise call the oracle to get score
                 # Call VASP or pre-trained model (No need of graph embeddings)
                 score = self.query_oracle(astr_x, x_keys[ind])
                 if np.logical_not(np.isnan(score)):
@@ -106,7 +113,7 @@ class LatentSpaceObjective:
         scores_arr = scores_arr[bool_arr]
         valid_zs = z[bool_arr]
 
-        valid_x_keys = x_keys[bool_arr]
+        valid_x_keys = [x_keys[i] for i, val in enumerate(bool_arr) if val == True]
         new_x_keys = [f'sample_{last_key_idx+i+1}' for i in range(len(valid_x_keys))]
         self.energy_code.rename_dirs(x_keys, valid_x_keys, new_x_keys)
         
@@ -121,7 +128,7 @@ class LatentSpaceObjective:
             x_next_keys.append(key)
             # graph_embeds_x = get_graph_embeds_from_astr(astr_xs[i])
             graph_embeds_x = self.megnet_short_model.predict_structure(astr_xs[i])
-            graph_embeds_x = graph_embeds_x.detach().cpu()
+            graph_embeds_x = graph_embeds_x.detach().cpu().numpy()
             decoded_xs_graph_embeds.append(graph_embeds_x)
             key_dict = {'x_tensor': decoded_xs[i], 
                         'astr': astr_xs[i],
@@ -132,11 +139,11 @@ class LatentSpaceObjective:
         decoded_xs_graph_embeds = np.array(decoded_xs_graph_embeds).astype('float32')
 
         out_dict = {}
-        out_dict['scores'] = scores_arr
-        out_dict['valid_zs'] = valid_zs
-        out_dict['decoded_xs_tensor'] = decoded_xs
-        out_dict['x_next_keys'] = x_next_keys
-        out_dict['decoded_xs_graph_embeds'] = decoded_xs_graph_embeds
+        out_dict['scores'] = scores_arr                                     # ndarray
+        out_dict['valid_zs'] = valid_zs                                     # tensor
+        out_dict['decoded_xs_tensor'] = decoded_xs                          # tensor
+        out_dict['x_next_keys'] = x_next_keys                               # str list
+        out_dict['decoded_xs_graph_embeds'] = decoded_xs_graph_embeds       # ndarray
         #out_dict['decoded_xs_keys'] = decoded_keys # VSCK: The xs_keys are stored in Lolbo_State; only used in lolbo_state; So not generated in Objective
         return out_dict
 

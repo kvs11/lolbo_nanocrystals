@@ -69,7 +69,11 @@ def get_astr_from_x_tensor(point_cloud, nc_vae_params):
                 pred_formula.append([elm_str[0]])
             else:
                 temp = pred_for_array[i]
-                temp = temp[:np.where(temp>0)[0][-1]+1]
+                #temp = temp[:np.where(temp>0)[0][-1]+1]
+                # VSCK: Previously, last non-zero is considered as limit. But it is 
+                # giving zeros in the middle of occupancy matrix. 
+                # So, use first zero as the limit instead
+                temp = temp[:np.where(temp==0)[0][0]]
                 temp = temp.tolist()
                 pred_formula.append([elm_str[int(j)] for j in temp])
         return pred_formula
