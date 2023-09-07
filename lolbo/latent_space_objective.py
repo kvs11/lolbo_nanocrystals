@@ -1,6 +1,7 @@
 import numpy as np
 import torch 
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.structure import get_astr_from_x_tensor
+from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.data_utils import inv_minmax
 
 
 class LatentSpaceObjective:
@@ -17,6 +18,7 @@ class LatentSpaceObjective:
         labels_count=0,
         num_calls=0,
         task_id='',
+        nc_vae_params=None,
         scaler_X=None,
         scaler_Y=None,
         energy_code=None,
@@ -39,6 +41,7 @@ class LatentSpaceObjective:
         #   to differentiate between similar tasks (ie for guacamol)
         self.task_id = task_id
 
+        self.vae_params = nc_vae_params
         self.scaler_X = scaler_X 
         self.scaler_Y = scaler_Y
 
@@ -68,13 +71,17 @@ class LatentSpaceObjective:
         if type(z) is np.ndarray: 
             z = torch.from_numpy(z).float()
         decoded_xs = self.vae_decode(z)
+
+        # un-scale the decoded_xs tensor
+        descaled_decoded_xs = inv_minmax(decoded_xs.detach().cpu(), self.scaler_X)
+
         x_keys = [f'sample_{last_key_idx+i+1}' for i in range(decoded_xs.shape[0])]
         scores = []
         astr_xs = []
-        for ind, x_tensor in enumerate(decoded_xs):
+        for ind, x_descaled in enumerate(descaled_decoded_xs):
             # VSCK: First make sure that the decoded structure is not a duplicate
             # of structures present in the pool
-            astr_x = get_astr_from_x_tensor(x_tensor, self.scaler_X)
+            astr_x = get_astr_from_x_tensor(x_descaled, self.vae_params)
             dupe_key = None
             # TODO: Check duplicates with Comparator from FANTASTX
             if dupe_key is not None:
@@ -87,7 +94,8 @@ class LatentSpaceObjective:
                 if np.logical_not(np.isnan(score)):
                     self.num_calls += 1
 
-            scores.append(score)
+            scaled_score = self.scaler_Y.transform([[score]])[0][0]
+            scores.append(scaled_score)
             astr_xs.append(astr_x)
 
         scores_arr = np.array(scores).astype('float32')

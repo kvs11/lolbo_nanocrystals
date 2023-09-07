@@ -48,6 +48,7 @@ class NanoCrystalObjective(LatentSpaceObjective):
             num_calls=num_calls,
             pool_dict=pool_dict,
             labels_count=labels_count,
+            nc_vae_params=nc_vae_params,
             scaler_X=scaler_X,
             scaler_Y=scaler_Y,
             energy_code=self.energy_code,
@@ -205,6 +206,9 @@ class NC_VAE_params:
         self.max_filters: int = 128
         self.filter_size: List = [5, 3, 3]
         self.strides: List = [2, 2, 1]
+        self.max_elms: int = 2
+        self.max_sites: int = 30
+        self.zero_pad_rows: int = 0
 
         if 'input_dim' in vae_params_dict:
             self.input_dim = vae_params_dict['input_dim']
@@ -224,6 +228,12 @@ class NC_VAE_params:
             self.filter_size = vae_params_dict['filter_size']
         if 'strides' in vae_params_dict:
             self.strides = vae_params_dict['strides']
+        if 'max_elms' in vae_params_dict:
+            self.max_elms = vae_params_dict['max_elms']
+        if 'max_sites' in vae_params_dict:
+            self.max_sites = vae_params_dict['max_sites']
+        if 'zero_pad_rows' in vae_params_dict:
+            self.zero_pad_rows = vae_params_dict['zero_pad_rows']
 
 
 if __name__ == "__main__":
