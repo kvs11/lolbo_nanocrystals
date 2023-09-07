@@ -17,6 +17,10 @@ class NanoCrystalOptimization(Optimize):
         self,
         path_to_vae_statedict: str=None,
         path_to_vae_ckpt: str="/sandbox/vkolluru/Gen_models_for_FANTASTX/May2023/1_LOLBO/practice/pt_model/m19/lightning_logs/NanoCrystalVAE/version_4/checkpoints/last.ckpt",
+        nc_vae_params = None,
+        init_train_X_path: str = None,
+        init_train_Y_path: str = None,
+        init_graph_embeds_path: str = None,
         fp_label: str='bag-of-bonds',
         fp_tolerances=[0.04, 0.7],
         path_to_energy_yaml: str=None,
@@ -24,6 +28,10 @@ class NanoCrystalOptimization(Optimize):
     ):
         self.path_to_vae_statedict = path_to_vae_statedict
         self.path_to_vae_ckpt = path_to_vae_ckpt
+        self.nc_vae_params = nc_vae_params
+        self.init_train_X_path = init_train_X_path
+        self.init_train_Y_path = init_train_Y_path
+        self.init_graph_embeds_path = init_graph_embeds_path
         self.fp_label = fp_label
         self.fp_tolerances = fp_tolerances
         self.path_to_energy_yaml = path_to_energy_yaml
@@ -39,6 +47,9 @@ class NanoCrystalOptimization(Optimize):
         self.objective = NanoCrystalObjective(
             path_to_vae_statedict=self.path_to_vae_statedict,
             path_to_vae_ckpt=self.path_to_vae_ckpt,
+            nc_vae_params=self.nc_vae_params,
+            scaler_X=self.scaler_X,
+            scaler_Y=self.scaler_Y,
             fp_label=self.fp_label,
             fp_tolerances=self.fp_tolerances,
             path_to_energy_yaml=self.path_to_energy_yaml
@@ -66,7 +77,12 @@ class NanoCrystalOptimization(Optimize):
         assert self.num_initialization_points <= 20_000 
         
         self.init_train_x_keys, self.init_train_x_tensor, self.init_train_graph_embeds, \
-                self.init_train_z, self.init_train_y  = load_nanocrystal_train_data()
+                self.init_train_z, self.init_train_y, self.scaler_X, self.scaler_Y = \
+                                load_nanocrystal_train_data(
+                                    inp_arr_path=self.init_train_X_path, 
+                                    y_vals_path=self.init_train_Y_path, 
+                                    embds_path=self.init_graph_embeds_path
+                                )
         # VSCK: init_train_x in molecules is divided into init_train_x_keys and init_train_x_tensor. 
         # Both will be used interchageably as required in the LOLBO framework
         #self.init_train_x_keys = ['sample_{i}' for i in range(self.init_train_x_tensor.shape[0])]
