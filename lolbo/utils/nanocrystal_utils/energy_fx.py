@@ -158,18 +158,10 @@ class lammps_code(object):
         # wait for the calculation to finish
         lammps_job.wait()
 
-        # save total energy to model attributes
-        total_energy = None
-        match = None
-        pattern = re.compile("Energy initial, next-to-last, final")
-        lines = open(f'{relax_path}/log_lammps.{astr_label}',
-                        'r').read().splitlines()
-        for line in lines:
-            if match is not None:
-                total_energy = float(line.split()[2])
-            match = re.search(pattern, line)
+        log_lammps_file = f'{relax_path}/log_lammps.{astr_label}'
+        initial_toten, final_toten = lammps_code.get_initial_and_final_energies(log_lammps_file)
 
-        if not total_energy:
+        if not final_toten:
             print('Model {} energy not found in log_lammps.{} file'.format(
                 astr_label, astr_label))
             print('LAMMPS relaxation on model {} NOT successful'.format(
@@ -189,17 +181,8 @@ class lammps_code(object):
         lammps_code.move_atoms_inside(relaxed_astr)
         relaxed_astr.to(filename=POSCAR_relaxed, fmt='poscar')
         
-        comp_dict = relaxed_astr.composition.as_dict()
-        astr_elems = [i.name for i in relaxed_astr.composition.elements]
-
-        # DU
-        free_en = total_energy
-        for elem in astr_elems:
-            if elem in self.sym_mu_dict.keys():
-                free_en -= comp_dict[elem]*self.sym_mu_dict[elem]
-            else:
-                print("Error. LAMMPS species " + elem +
-                        " not contained in input yaml file.")
+        initial_form_en = self.get_formn_free_energy(relaxed_astr, initial_toten)
+        final_form_en = self.get_formn_free_energy(relaxed_astr, final_toten)
                 
         # Following are done in relax:
         # save relaxed_structure - done in do_relaxation
@@ -209,7 +192,23 @@ class lammps_code(object):
         # checks if relaxation is successful; gives error message and do not go
         # ahead with the structure (goes back and creates new strucutre)
 
-        return free_en
+        return astr, relaxed_astr, initial_form_en, final_form_en
+
+    def get_formn_free_energy(self, relaxed_astr, total_energy):
+        """
+        Returns the formation free energy given total energy using mu from species dict 
+        """
+        comp_dict = relaxed_astr.composition.as_dict()
+        astr_elems = [i.name for i in relaxed_astr.composition.elements]
+
+        for elem in astr_elems:
+            if elem in self.sym_mu_dict.keys():
+                total_energy -= comp_dict[elem]*self.sym_mu_dict[elem]
+            else:
+                print("Error. LAMMPS species " + elem +
+                        " not contained in input yaml file.")
+    
+        return total_energy
 
     @staticmethod
     def get_relaxed_cell(rlx_astr, data_in_path, element_symbols, last_only=True):
@@ -424,6 +423,21 @@ class lammps_code(object):
         for vx_key, nx_key in zip(valid_x_keys, new_x_keys):
             os.rename(calcs_path + f'/{vx_key}', calcs_path + f'/{nx_key}')
 
+    @staticmethod
+    def get_initial_and_final_energies(log_lammps_path):
+        """
+        Returns the energy of the initial step and the final step
+        """
+        match = None
+        pattern = re.compile("Energy initial, next-to-last, final")
+        lines = open(log_lammps_path, 'r').read().splitlines()
+        for line in lines:
+            if match is not None:
+                initial_en = float(line.split()[0])
+                final_en = float(line.split()[2])
+            match = re.search(pattern, line)
+
+        return initial_en, final_en
 
 
 class vasp_code(object):
