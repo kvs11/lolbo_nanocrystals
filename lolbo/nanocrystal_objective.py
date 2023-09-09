@@ -1,11 +1,13 @@
 import os
 import numpy as np
 import torch 
+import joblib
 from operator import itemgetter
 from collections import OrderedDict
 from typing import List, Callable, Union, Any, TypeVar, Tuple
 
 import matgl
+from sklearn.preprocessing import OneHotEncoder
 
 from lolbo_nanocrystal.lolbo.latent_space_objective import LatentSpaceObjective
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.models.IrOx_VAE import NanoCrystalVAE
@@ -84,10 +86,10 @@ class NanoCrystalObjective(LatentSpaceObjective):
         # method to 
         # --> convert FTCP to VASP inputs
         # Runs VASP and returns the objective function value (eg. formation energy)
-        score = self.energy_code.get_score(astr_x, astr_label)
+        output = self.energy_code.get_score(astr_x, astr_label)
         #score = get_y_val_from_astr(astr_x, astr_label, self.energy_code)
 
-        return score
+        return output
 
 
     def initialize_vae(self):
@@ -192,6 +194,91 @@ class NanoCrystalObjective(LatentSpaceObjective):
         
         return z, vae_loss
 
+    def get_PC_from_astr(self, crystal, nc_vae_params):
+        """
+        A method to return the input PC array for a given structure object
+        """
+        max_elms = nc_vae_params.max_elms
+        max_sites = nc_vae_params.max_sites
+        zero_pad_rows = nc_vae_params.zero_pad_rows
+
+        # Read string of elements considered in the study
+        try:
+            src_path = '/home/vkolluru/GenerativeModeling/FTCPcode/src' 
+            elm_str = joblib.load(src_path + '/data/element.pkl')
+        except:
+            print ('Provide the correct path to element.pkl and atom_init.json')
+
+        # Build one-hot vectors for the elements
+        elm_onehot = np.arange(1, len(elm_str)+1)[:,np.newaxis]
+        elm_onehot = OneHotEncoder().fit_transform(elm_onehot).toarray()
+
+        # Obtain element matrix
+        elm, elm_idx = np.unique(crystal.atomic_numbers, return_index=True)
+        # Sort elm to the order of sites in the Poscar
+        site_elm = np.array(crystal.atomic_numbers)
+        elm = site_elm[np.sort(elm_idx)]
+
+        # Zero pad element matrix to have at least 3 columns
+        ELM = np.zeros((len(elm_onehot), max(max_elms, 3),))
+
+        ELM[:, :len(elm)] = elm_onehot[elm-1,:].T
+
+        # Obtain lattice matrix
+        latt = crystal.lattice
+        LATT = np.array((latt.abc, latt.angles))
+        # Zero pad each set of info matrices to have at least 3 columns 
+        # and max_elms rows
+        LATT = np.pad(LATT, 
+                      ((0, 0), (0, max(max_elms, 3)-LATT.shape[1])), 
+                      constant_values=0)
+        
+        # Obtain site coordinate matrix
+        SITE_COOR = np.array([site.frac_coords for site in crystal])
+        # Pad site coordinate matrix up to max_sites rows and max_elms columns
+        SITE_COOR = np.pad(SITE_COOR, 
+                           ((0, max_sites-SITE_COOR.shape[0]), 
+                            (0, max(max_elms, 3)-SITE_COOR.shape[1])), 
+                           constant_values=0)
+
+        # Obtain site occupancy matrix
+        # Get the indices of elm that can be used to reconstruct site_elm
+        elm_inverse = np.zeros(len(crystal), dtype=int) 
+        for count, e in enumerate(elm):
+            elm_inverse[np.argwhere(site_elm == e)] = count
+
+        SITE_OCCU = OneHotEncoder().fit_transform(
+                            elm_inverse[:,np.newaxis]).toarray()
+        SITE_OCCU = np.pad(SITE_OCCU, 
+                           ((0, max_sites-SITE_OCCU.shape[0]),
+                            (0, max(max_elms, 3)-SITE_OCCU.shape[1])), 
+                           constant_values=0)
+   
+        # Concatenate all matrix sets to create PointCloud representation
+        PC = np.concatenate((ELM, LATT, SITE_COOR, SITE_OCCU), axis=0)
+
+        # TODO: Automatically determine zero_pad_rows ()= PC.shape[0] %4)
+        if zero_pad_rows > 0:
+            if zero_pad_rows%2 == 0:
+                top_pad = bot_pad = zero_pad_rows / 2
+            if zero_pad_rows%2 == 1:
+                top_pad = int(zero_pad_rows/2)
+                bot_pad = top_pad + 1
+            top_zeros = np.zeros((top_pad, max(max_elms, 3)))
+            bot_zeros = np.zeros((bot_pad, max(max_elms, 3)))
+            PC = np.concatenate((top_zeros, PC, bot_zeros), axis=0)
+                
+        return PC.astype('float32')
+
+    def get_PCs_from_astrs(self, astrs):
+        """
+        convenience function for multiplt structures
+        """
+        PCs = []
+        for astr in astrs:
+            PCs.append(self.get_PC_from_astr(astr))
+
+        return np.array(PCs).astype('float32')
 
 class NC_VAE_params:
 
