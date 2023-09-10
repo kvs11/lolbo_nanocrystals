@@ -121,17 +121,21 @@ class LatentSpaceObjective:
         # Get Xs from the astr_xs
         PCs = self.get_PCs_from_astrs(astr_xs)
         scaled_Xs, _ = minmax(PCs, self.scaler_X)
+        scaled_Xs = torch.tensor(scaled_Xs)
+
 
         # Get graph_embeds from astr_xs
         graph_embeds = []
         for astr_x in astr_xs:
             ge = self.megnet_short_model.predict_structure(astr_x)
-            ge = graph_embeds.detach().cpu().numpy()
+            ge = ge.detach().cpu().numpy()
             graph_embeds.append(ge)
         graph_embeds = np.array(graph_embeds).astype('float32')
 
         # Get Zs for all the new astrs
-        Zs = self.vae.encode(torch.tensor(scaled_Xs), torch.tensor(graph_embeds))
+        mu_, log_var_, _ = self.vae.encoder(input=torch.tensor(scaled_Xs).cuda(), 
+                                            graph_embeds=torch.tensor(graph_embeds).cuda())
+        Zs = self.vae.reparameterize(mu_, log_var_)
 
 
         valid_x_dirs = [x_keys[i] for i in range(len(x_keys)) if i not in failed_inds]
