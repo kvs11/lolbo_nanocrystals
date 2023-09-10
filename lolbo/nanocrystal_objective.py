@@ -194,13 +194,13 @@ class NanoCrystalObjective(LatentSpaceObjective):
         
         return z, vae_loss
 
-    def get_PC_from_astr(self, crystal, nc_vae_params):
+    def get_PC_from_astr(self, crystal):
         """
         A method to return the input PC array for a given structure object
         """
-        max_elms = nc_vae_params.max_elms
-        max_sites = nc_vae_params.max_sites
-        zero_pad_rows = nc_vae_params.zero_pad_rows
+        max_elms = self.vae_params.max_elms
+        max_sites = self.vae_params.max_sites
+        zero_pad_rows = self.vae_params.zero_pad_rows
 
         # Read string of elements considered in the study
         try:
