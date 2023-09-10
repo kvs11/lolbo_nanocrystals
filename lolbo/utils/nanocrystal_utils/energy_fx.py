@@ -417,11 +417,18 @@ class lammps_code(object):
         # Rename failed dirs to create empty space (to avoid overwriting)
         for x_key in x_keys:
             if x_key not in valid_x_keys:
-                os.rename(calcs_path + f'/{x_key}', calcs_path + \
-                    f'/failed_{x_key}_{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}')
+                try:
+                    os.rename(calcs_path + f'/{x_key}', calcs_path + \
+                        f'/failed_{x_key}_{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}')
+                except:
+                    print ('test test test', x_key)
+                    continue
+            else:
+                os.rename(calcs_path + f'/{x_key}', calcs_path + f'/temp_{x_key}')
+                
         # Now, rename valid dirs to new key names
         for vx_key, nx_key in zip(valid_x_keys, new_x_keys):
-            os.rename(calcs_path + f'/{vx_key}', calcs_path + f'/{nx_key}')
+            os.rename(calcs_path + f'/temp_{vx_key}', calcs_path + f'/{nx_key}')
 
     @staticmethod
     def get_initial_and_final_energies(log_lammps_path):
