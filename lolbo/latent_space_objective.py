@@ -131,6 +131,7 @@ class LatentSpaceObjective:
             ge = ge.detach().cpu().numpy()
             graph_embeds.append(ge)
         graph_embeds = np.array(graph_embeds).astype('float32')
+        graph_embeds = torch.tensor(graph_embeds).float()
 
         # Get Zs for all the new astrs
         mu_, log_var_, _ = self.vae.encoder(input=torch.tensor(scaled_Xs).cuda(), 
@@ -153,17 +154,17 @@ class LatentSpaceObjective:
             x_next_keys.append(key)
             key_dict = {'x_tensor': scaled_Xs[i], 
                         'astr': astr_xs[i],
-                        'graph_embeds': graph_embeds,
+                        'graph_embeds': graph_embeds[i],
                         'score': scores_arr[i]}
             self.pool_dict[key] = key_dict 
 
 
         out_dict = {}
-        out_dict['scores'] = scores_arr                                # ndarray
+        out_dict['scores'] = scores_arr                                # tensor
         out_dict['valid_zs'] = Zs                                      # tensor
         out_dict['decoded_xs_tensor'] = scaled_Xs                      # tensor
         out_dict['x_next_keys'] = x_next_keys                          # str list
-        out_dict['decoded_xs_graph_embeds'] = graph_embeds             # ndarray
+        out_dict['decoded_xs_graph_embeds'] = graph_embeds             # tensor
         #out_dict['decoded_xs_keys'] = decoded_keys # VSCK: The xs_keys are stored in Lolbo_State; only used in lolbo_state; So not generated in Objective
         return out_dict
 

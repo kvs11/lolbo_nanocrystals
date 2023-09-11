@@ -216,9 +216,9 @@ class LOLBOState:
             train_y_tensors.append(self.objective.pool_dict[each_key]['score'])
 
         # convert lists to tensors
-        train_x_tensors = torch.tensor(train_x_tensors, dtype=torch.float)
-        train_graph_embeds = torch.tensor(train_graph_embeds, dtype=torch.float)
-        train_y_tensors = torch.tensor(train_y_tensors, dtype=torch.float)
+        train_x_tensors = torch.stack(train_x_tensors)
+        train_graph_embeds = torch.stack(train_graph_embeds)
+        train_y_tensors = torch.tensor(train_y_tensors).float()
 
         self.objective, self.model = update_models_end_to_end(
             train_x_tensors,
@@ -274,8 +274,8 @@ class LOLBOState:
                     optimizer1.step() 
                     with torch.no_grad(): 
                         z = z.detach().cpu()
-                        decoded_xs_tensor = torch.from_numpy(decoded_xs_tensor).float()
-                        decoded_graph_embeds = torch.from_numpy(decoded_graph_embeds).float()
+                        decoded_xs_tensor = torch.tensor(decoded_xs_tensor).float()
+                        decoded_graph_embeds = torch.tensor(decoded_graph_embeds).float()
                         self.update_next(z, scores_arr, decoded_xs_tensor, 
                                          decoded_xs_keys, decoded_graph_embeds)
             torch.cuda.empty_cache()
@@ -311,9 +311,9 @@ class LOLBOState:
 
         # 3. Add new evaluated points to dataset (update_next)
         if len(y_next) != 0:
-            y_next = torch.from_numpy(y_next).float()
-            x_next_tensor = torch.from_numpy(x_next_tensor).float()
-            graph_embeds_next = torch.from_numpy(graph_embeds_next).float()
+            y_next = torch.tensor(y_next).float()
+            x_next_tensor = torch.tensor(x_next_tensor).float()
+            graph_embeds_next = torch.tensor(graph_embeds_next).float()
             self.update_next(
                 z_next,
                 y_next,
