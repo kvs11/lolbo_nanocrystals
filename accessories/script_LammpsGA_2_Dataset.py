@@ -5,7 +5,7 @@ calculations of candidates within a FANTASTX run.
 from sklearn.model_selection import train_test_split
 import numpy as np
 import json
-import os
+import os, random
 
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.energy_fx import lammps_code
 from lolbo_nanocrystal.lolbo.utils.nanocrystal_utils.fingerprinting import Comparator
@@ -14,9 +14,10 @@ from fx19 import structure_record
 
 
 # variables to be given as input
-element_symbols = ['Cd', 'Te']                    # all elements present in the system
+element_symbols = ['Cd', 'Te']              # all elements present in the system
+mu_list = [-1.16, -2.19]                    # Required if formation energy is needed
 fp_label = 'bag-of-bonds'                   # fingerprinting mode
-fp_tolerances = {fp_label: [0.04, 0.7]}     # tolerances for the fingerprinting mode
+fp_tolerances = {fp_label: [0.05, 0.8]}     # tolerances for the fingerprinting mode
 main_path = '/sandbox/vkolluru/Gen_models_for_FANTASTX/test_cases/CdTe_sw/FX_2000'
 calcs_dir_path = main_path + '/calcs'       # path to calcs dir
 max_n_for_vae = 500                         # use first 500 candidate lammps relaxations 
@@ -50,28 +51,33 @@ save_data_as_json = True
     }
 }
 """
-custom_keys = []                # custom_keys list to be added to data dict
-custom_funcs = []               # functions list to calculate custom_vals 
-                                # corresponding to the custom_keys
 
 # Example custom function to calculate the formation energies of CdTe 
 # structures with a user-provided mu_Cd and mu_Te values
-def form_en_func(*args):
+def form_epa_func(tot_en, nAtoms_list, mu_list):
     '''
     The custom function to calculate formation energy. 
     The inputs should be the list of keys within the data dict
     '''
-    tot_en, n_Cd, n_Te = args
-    mu_Cd, mu_Te = 1.16, 2.19
-    return tot_en - n_Cd*mu_Cd - n_Te*mu_Te
+    form_en = tot_en
+    for i in range(len(nAtoms_list)):
+        form_en -= nAtoms_list[i] * mu_list[i]
+    fepa = form_en / sum(nAtoms_list)
+    return fepa
 
 
 # Create dataset from lammps relaxations
 
 # create dataset_directory 
-os.mkdir(dataset_dir)#, exist_ok=True)
-os.mkdir(dataset_dir+'/train_set_poscars')#, exist_ok=True)
-os.mkdir(dataset_dir+'/test_set_poscars')#, exist_ok=True)
+if not os.path.exists(dataset_dir):
+    os.mkdir(dataset_dir)
+if os.path.exists(dataset_dir+'/train_set_poscars') or \
+                    os.path.exists(dataset_dir+'/test_set_poscars'):
+    print ('Error: train_set_poscars directory already exists!!')
+    quit()
+else:
+    os.mkdir(dataset_dir+'/train_set_poscars')
+    os.mkdir(dataset_dir+'/test_set_poscars')
 
 # Go to calcs dir and get all model dirs
 if max_n_for_vae is not None:
@@ -145,9 +151,12 @@ for set_type in ['train', 'test']:
         pos_dict['comp_dict'] = astr.composition.as_dict()
         pos_dict['total_atoms'] = int(sum(pos_dict['comp_dict'].values()))
         pos_dict['epa'] = toten / pos_dict['total_atoms']
-        #pos_dict['formation_energy'] = form_en_func(toten, 
-        #                                            pos_dict['comp_dict']['Cd'],
-        #                                            pos_dict['comp_dict']['Te'])
+
+        # custom key and custom function for its values can be inserted
+        pos_dict['formation_epa'] = form_epa_func(toten, 
+                                                  [pos_dict['comp_dict']['Cd'], 
+                                                   pos_dict['comp_dict']['Te']], 
+                                                  mu_list)
         full_data[pos_key] = pos_dict
 
         # save poscars
@@ -160,7 +169,10 @@ for set_type in ['train', 'test']:
                 json.dump(full_data, f, indent=4)
 
 with open(dataset_dir+ '/params_of_dataset.txt', 'w') as f:
-    par_lines = [f"fp_label = {fp_label}\n",
+    par_lines = [f"Total structures: {len(all_astrs)}",
+                 f"Unique structures: {len(uniq_tot_ens)}",
+                 f"Train / Test: {len(train_astrs)} / {len(test_astrs)}",
+                 f"fp_label = {fp_label}\n",
                  f"fp_tolerances = {fp_tolerances}\n",
                  f"max_n_for_vae = {max_n_for_vae}\n",
                  f"test_set_size = {test_set_size}\n",
