@@ -146,7 +146,7 @@ def read_data_file(data_file_path, key):
     """
     pass
 
-if "__name__" == "__main__":
+if __name__ == "__main__":
     # Variable input parameters needed for this script
     dataset_path = "test_set_poscars"           # path to the dataset_poscars
     data_file_path = "test_set_as_json.json"    # data values file (as_dict.npy or .json) path 

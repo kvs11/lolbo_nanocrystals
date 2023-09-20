@@ -19,6 +19,8 @@ import numpy as np
 import json
 
 import matgl
+matgl.clear_cache()
+
 from matgl.config import DEFAULT_ELEMENT_TYPES
 from matgl.graph.compute import compute_pair_vector_and_distance
 from matgl.layers import MLP, BondExpansion, EdgeSet2Set, EmbeddingBlock, MEGNetBlock, SoftExponential, SoftPlus2
@@ -240,7 +242,7 @@ class MEGNetShortModel(nn.Module, IOMixIn):
 
 #########
 
-if "__name__" == "__main__":
+if __name__ == "__main__":
     # Get dataset info and get embeddings
     dataset_path = "test_set_poscars"
     dataset_json = "test_set_as_json.json" 
