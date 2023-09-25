@@ -4,8 +4,20 @@ import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 import umap
 
+############ UMAP Plot
+Y_array_path = ""
+latent_Zs_path = "latent_Zs.npy"
+
+a, b, c = 100, 400, 0.02
+plot_title = "Latent space 2D-UMAP"
+plot_type = "continuous"            # or "continuous"
+plot_name = "umap_continuous.png"    # or "umap_intervals.png"
+
+# Do not change this
+n_intervals = 10    
+
 ############################################################
-# t-SNE representation for fingerprints/representations
+# UMAP representation for fingerprints/representations
 ############################################################
 
 def get_UMAP_2D_embedding(fingerprints, n_neighbors=15, n_epochs=None, min_dist=0.1):
@@ -25,22 +37,19 @@ def get_UMAP_2D_embedding(fingerprints, n_neighbors=15, n_epochs=None, min_dist=
     ty = scale_to_01_range(ty)
     return tx,ty
 
+##########################
 
-############ UMAP Plot
-
-latent_Zs_path = ""
-Y_array_path = ""
-
-a, b, c = 100, 400, 0.02
-plot_title = ""
-plot_type = "intervals"            # or "continuous"
-plot_name = "umap_intervals.png"    # or "umap_continuous.png"
 
 latent_Zs = np.load(latent_Zs_path, allow_pickle=True).astype('float32')
 Y = np.load(Y_array_path, allow_pickle=True).astype('float32')
 
-# Custom y_intervals are being used to have > 1.6 models as outliers group. 
-y_intervals = [min(Y)-0.0001, 0.2, 0.3, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, max(Y)+0.0001]
+# To determine a custom intervals window, run this 
+# -----------
+y_intervals = []
+# Sort y values and create y intervals by count
+sorted_ys = np.sort(Y)
+group_n = int(Y.shape[0] / n_intervals)           # 10 intervals
+y_intervals = [sorted_ys[group_n*i] for i in range(n_intervals)] + [sorted_ys[-1]]
 
 interval_inds = []
 for i in range(len(y_intervals)):
@@ -52,12 +61,12 @@ for i in range(len(y_intervals)):
 test_lens = [len(i) for i in interval_inds]
 
 
-legends = [' < 0.2', '0.2 - 0.3', '0.3 - 0.4', '0.4 - 0.6', 
-            '0.6 - 0.8', '0.8 - 1.0', '1.0 - 1.2', '1.2 - 1.4', ' > 1.4']
-#colors = [plt.cm.tab10(i) for i in range(10)]
-#del colors[7] # remove dark gray color
-colors = [plt.cm.Set1(i) for i in range(9)]
+legends = ['({:.2f} : {:.2f})'.format(y_intervals[i], y_intervals[i+1]) \
+            for i in range(len(y_intervals)-1)]  
+
+colors = [plt.cm.tab10(i) for i in range(n_intervals)]
 colors.reverse()
+# -----------
 
 
 tx, ty = get_UMAP_2D_embedding(latent_Zs, n_neighbors=a, n_epochs=b, min_dist=c)
@@ -67,17 +76,15 @@ if plot_type == "intervals":
     fig = plt.figure(figsize=(8, 8))
     ax = fig.add_subplot(111)
     plt.tick_params(labelsize=18)
-    plotting_seq = [i for i in range(9)]
+    plotting_seq = [i for i in range(n_intervals)]
     plotting_seq.reverse()
-    alphas = [0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 1, 1]
+    alphas = [0.9] * n_intervals
     handles = []
     for i, j in enumerate(plotting_seq):
         group_inds = interval_inds[j]
         color = colors[i]
-        if i==7:
-            color='red'
-        if i==8:
-            color='black'
+        if i==n_intervals-1:
+            color = 'black'
         alpha = alphas[i]
         current_tx = np.take(tx, group_inds)
         current_ty = np.take(ty, group_inds)
@@ -96,17 +103,18 @@ if plot_type == "continuous":
     ax = fig.add_subplot(111)
     plt.tick_params(labelsize=18)
 
+    sorted_tx = [xx for _, xx in sorted(zip(Y, tx), reverse=True)]
+    sorted_ty = [yy for _, yy in sorted(zip(Y, ty), reverse=True)]
+
     # Set all Y>1.4 equal to 1.41
     mask_Y = Y.copy()
-    mask_Y[mask_Y>1.4] = 1.41
-    sorted_tx = [xx for _, xx in sorted(zip(mask_Y, tx), reverse=True)]
-    sorted_ty = [yy for _, yy in sorted(zip(mask_Y, ty), reverse=True)]
     mask_Y[::-1].sort()
+    mask_Y[mask_Y>0] = 0
 
     plt.scatter(sorted_tx, sorted_ty, c=mask_Y, cmap='brg', s=15, alpha=1)
     cb = plt.colorbar()
     #cb = plt.colorbar(im, orientation="horizontal", pad=0.15)
-    cb.set_label(label=r'E$_f$ (meV/atom)', size=18)
+    cb.set_label(label=r'E$_f$ (eV/atom)', size=18)
     cb.ax.tick_params(labelsize=18)
     plt.title(plot_title, fontsize=20)
     plt.tight_layout()
