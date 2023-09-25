@@ -7,7 +7,7 @@ import math
 
 ########################## Utility functions ################################
 
-def minmax(FTCP):
+def minmax(FTCP, scaler=None):
     '''
     This function performs data normalization for FTCP representation along the second dimension
 
@@ -26,7 +26,8 @@ def minmax(FTCP):
     '''
     
     dim0, dim1, dim2 = FTCP.shape
-    scaler = MinMaxScaler()
+    if scaler is None:
+        scaler = MinMaxScaler()
     FTCP_ = np.transpose(FTCP, (1, 0, 2))
     FTCP_ = FTCP_.reshape(dim1, dim0*dim2)
     FTCP_ = scaler.fit_transform(FTCP_.T)

@@ -223,7 +223,7 @@ class Optimize(object):
             best input is found, as well as at the end 
             of the optimization run
             (only used if self.verbose==True)
-            More print statements can be added her as desired
+            More print statements can be added here as desired
         '''
         if self.track_with_wandb:
             print(f"Optimization Run: {self.wandb_project_name}, {wandb.run.name}")
