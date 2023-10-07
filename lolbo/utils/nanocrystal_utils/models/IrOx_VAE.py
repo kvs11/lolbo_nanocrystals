@@ -28,14 +28,14 @@ from pytorch_lightning import seed_everything
 seed_everything(199, workers=True)
 
 
-BATCH_SIZE = 256
 ENCODER_LR = 1e-4
 DECODER_LR = 1e-4
 ENCODER_WARMUP_STEPS = 100
 DECODER_WARMUP_STEPS = 100
 AGGRESSIVE_STEPS = 5
+KL_LOSS_WARMUP_STEPS = 200  # keep greater than Decoder warmup to delay penalizing reconstruction
+REG_LOSS_WARMUP_STEPS = 200
 TORCH_DISTRIBUTED_DEBUG = 'INFO'
-
 
 
 class EncoderAndRegressor(nn.Module):
@@ -303,12 +303,25 @@ class NanoCrystalVAE(pl.LightningModule):
         _, mu_, log_var_, reg_output_, reconstructed_output_ = itemgetter(
             'z', 'mu', 'log_var', 'reg_output', 'reconstructed_output')(outputs_dict)
         
+        def coeff_warmup(step, warmup_steps):
+            if step < warmup_steps:
+                return 0.
+            elif step >= warmup_steps and step < 2 * warmup_steps:
+                return (step - warmup_steps) / warmup_steps
+            else:
+                return 1.
+
         # Compute the loss and its gradients
+        coeff_KL_warmed_up = self.hparams.coeffs[1] * coeff_warmup(
+                                    self.trainer.global_step, KL_LOSS_WARMUP_STEPS)
+        coeff_reg_warmed_up = self.hparams.coeffs[2] * coeff_warmup(
+                                    self.trainer.global_step, REG_LOSS_WARMUP_STEPS)
+
         loss_fn_args = [reconstructed_output_, input_xs, mu_, log_var_, reg_output_, target_ys]
         loss_fn_kwargs = {
             'coeff_recon': self.hparams.coeffs[0],
-            'coeff_KL': self.hparams.coeffs[1], 
-            'coeff_reg': self.hparams.coeffs[2]
+            'coeff_KL': coeff_KL_warmed_up, 
+            'coeff_reg': coeff_reg_warmed_up
         }
         loss_dict = NanoCrystalVAE.loss_function(*loss_fn_args, **loss_fn_kwargs)
 
