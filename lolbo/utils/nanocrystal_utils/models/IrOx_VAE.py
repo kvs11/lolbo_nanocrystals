@@ -264,7 +264,7 @@ class NanoCrystalVAE(pl.LightningModule):
         
         loss = torch.mean(coeff_recon * recons_loss + coeff_KL * kld_loss + coeff_reg * reg_loss)
         return {'loss': loss, 'Reconstruction_loss':recons_loss, 
-                'KLD_loss':-kld_loss, 'Regression_loss': reg_loss}
+                'KLD_loss':-kld_loss.mean(), 'Regression_loss': reg_loss}
 
     # This is same as sample_posterior in lolbo
     def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
@@ -340,7 +340,7 @@ class NanoCrystalVAE(pl.LightningModule):
 
         # Log losses every step
         for k, v in loss_dict.items():
-            self.log('train/' + k, v, on_step=True, on_epoch=True, prog_bar=False, logger=True)
+            self.log('train/' + k, v, on_step=True, on_epoch=False, prog_bar=False, logger=True)
 
         return loss_dict['loss']
 
@@ -371,14 +371,14 @@ class NanoCrystalVAE(pl.LightningModule):
         loss_fn_args = [reconstructed_output_, input_xs, mu_, log_var_, reg_output_, target_ys]
         loss_fn_kwargs = {
             'coeff_recon': self.hparams.coeffs[0],
-            'coeff_KL': self.hparams.coeffs[1], 
-            'coeff_reg': self.hparams.coeffs[2]
+            'coeff_KL': coeff_KL_warmed_up, 
+            'coeff_reg': coeff_reg_warmed_up
         }
         loss_dict = NanoCrystalVAE.loss_function(*loss_fn_args, **loss_fn_kwargs)
 
         # Log losses every step
         for k, v in loss_dict.items():
-            self.log('validation/' + k, v, on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
+            self.log('validation/' + k, v, on_step=True, on_epoch=False, prog_bar=False, logger=True, sync_dist=True)
 
         return loss_dict['loss']    
 
