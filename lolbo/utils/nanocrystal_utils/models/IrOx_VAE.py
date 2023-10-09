@@ -28,13 +28,6 @@ from pytorch_lightning import seed_everything
 seed_everything(199, workers=True)
 
 
-ENCODER_LR = 1e-4
-DECODER_LR = 1e-4
-ENCODER_WARMUP_STEPS = 100
-DECODER_WARMUP_STEPS = 100
-AGGRESSIVE_STEPS = 5
-KL_LOSS_WARMUP_STEPS = 200  # keep greater than Decoder warmup to delay penalizing reconstruction
-REG_LOSS_WARMUP_STEPS = 200
 TORCH_DISTRIBUTED_DEBUG = 'INFO'
 
 
@@ -50,6 +43,13 @@ class EncoderAndRegressor(nn.Module):
             max_filters: int = 128, 
             filter_size: List = [5, 3, 3], 
             strides: List = [2, 2, 1],
+            encoder_lr: float = 1e-4,
+            decoder_lr: float = 1e-4,
+            encoder_warmup_steps: int = 100,
+            decoder_warmup_steps: int = 100,
+            aggressive_steps: int = 5,
+            KL_loss_warmup_steps: int = 200,
+            Reg_loss_warmup_steps: int = 200,
     ) -> None:
         super(EncoderAndRegressor, self).__init__()
 
@@ -132,7 +132,14 @@ class Decoder(nn.Module):
             latent_dim: int = 32, 
             max_filters: int = 128, 
             filter_size: List = [5, 3, 3], 
-            strides: List = [2, 2, 1],            
+            strides: List = [2, 2, 1],
+            encoder_lr: float = 1e-4,
+            decoder_lr: float = 1e-4,
+            encoder_warmup_steps: int = 100,
+            decoder_warmup_steps: int = 100,
+            aggressive_steps: int = 5,
+            KL_loss_warmup_steps: int = 200,
+            Reg_loss_warmup_steps: int = 200,           
     ):
         super(Decoder, self).__init__()
 
@@ -220,7 +227,14 @@ class NanoCrystalVAE(pl.LightningModule):
             latent_dim: int = 32, 
             max_filters: int = 128, 
             filter_size: List = [5, 3, 3], 
-            strides: List = [2, 2, 1],       
+            strides: List = [2, 2, 1],
+            encoder_lr: float = 1e-4,
+            decoder_lr: float = 1e-4,
+            encoder_warmup_steps: int = 100,
+            decoder_warmup_steps: int = 100,
+            aggressive_steps: int = 5,
+            KL_loss_warmup_steps: int = 200, # keep greater than Decoder warmup to delay penalizing reconstruction
+            Reg_loss_warmup_steps: int = 200,       
     ) -> None:
         super(NanoCrystalVAE, self).__init__()
         self.save_hyperparameters()
@@ -230,7 +244,6 @@ class NanoCrystalVAE(pl.LightningModule):
 
         self.validation_step_outputs = []
         self.training_step_outputs = []
-
 
     @abstractmethod
     def loss_function(*args: Any, **kwargs) -> Tensor:
@@ -313,9 +326,9 @@ class NanoCrystalVAE(pl.LightningModule):
 
         # Compute the loss and its gradients
         coeff_KL_warmed_up = self.hparams.coeffs[1] * coeff_warmup(
-                                    self.trainer.global_step, KL_LOSS_WARMUP_STEPS)
+                                    self.trainer.global_step, self.hparams.KL_loss_warmup_steps)
         coeff_reg_warmed_up = self.hparams.coeffs[2] * coeff_warmup(
-                                    self.trainer.global_step, REG_LOSS_WARMUP_STEPS)
+                                    self.trainer.global_step, self.hparams.Reg_loss_warmup_steps)
 
         loss_fn_args = [reconstructed_output_, input_xs, mu_, log_var_, reg_output_, target_ys]
         loss_fn_kwargs = {
@@ -327,7 +340,7 @@ class NanoCrystalVAE(pl.LightningModule):
 
         # Log losses every step
         for k, v in loss_dict.items():
-            self.log('train/' + k, v, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+            self.log('train/' + k, v, on_step=True, on_epoch=True, prog_bar=False, logger=True)
 
         return loss_dict['loss']
 
@@ -340,6 +353,20 @@ class NanoCrystalVAE(pl.LightningModule):
         _, mu_, log_var_, reg_output_, reconstructed_output_ = itemgetter(
             'z', 'mu', 'log_var', 'reg_output', 'reconstructed_output')(outputs_dict)
         
+        def coeff_warmup(step, warmup_steps):
+            if step < warmup_steps:
+                return 0.
+            elif step >= warmup_steps and step < 2 * warmup_steps:
+                return (step - warmup_steps) / warmup_steps
+            else:
+                return 1.
+
+        # Compute the loss and its gradients
+        coeff_KL_warmed_up = self.hparams.coeffs[1] * coeff_warmup(
+                                    self.trainer.global_step, self.hparams.KL_loss_warmup_steps)
+        coeff_reg_warmed_up = self.hparams.coeffs[2] * coeff_warmup(
+                                    self.trainer.global_step, self.hparams.Reg_loss_warmup_steps)
+
         # Compute the loss and its gradients
         loss_fn_args = [reconstructed_output_, input_xs, mu_, log_var_, reg_output_, target_ys]
         loss_fn_kwargs = {
@@ -351,7 +378,7 @@ class NanoCrystalVAE(pl.LightningModule):
 
         # Log losses every step
         for k, v in loss_dict.items():
-            self.log('validation/' + k, v, on_step=False, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
+            self.log('validation/' + k, v, on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
 
         return loss_dict['loss']    
 
@@ -370,8 +397,8 @@ class NanoCrystalVAE(pl.LightningModule):
 
         def encoder_lr_sched(step):
             # Use Linear warmup
-            if step < ENCODER_WARMUP_STEPS:
-                return min(step / ENCODER_WARMUP_STEPS, 1.)
+            if step < self.hparams.encoder_warmup_steps:
+                return min(step / self.hparams.encoder_warmup_steps, 1.)
             else:
                 if step >= 250*35:
                     if step % 50*35 == 0:
@@ -383,7 +410,7 @@ class NanoCrystalVAE(pl.LightningModule):
                 
 
         def decoder_lr_sched(step):
-            if step < ENCODER_WARMUP_STEPS:
+            if step < self.hparams.encoder_warmup_steps:
                 return 0.
             else:
                 if step >= 250*35:
@@ -391,8 +418,10 @@ class NanoCrystalVAE(pl.LightningModule):
                         return 0.1
                     else:
                         return 1.
-                if (step - ENCODER_WARMUP_STEPS + 1) % AGGRESSIVE_STEPS == 0:
-                    return min((step - ENCODER_WARMUP_STEPS) / (DECODER_WARMUP_STEPS * AGGRESSIVE_STEPS), 1.)
+                if (step - self.hparams.encoder_warmup_steps + 1) \
+                                    % self.hparams.aggressive_steps == 0:
+                    return min((step - self.hparams.encoder_warmup_steps) / \
+                               (self.hparams.decoder_warmup_steps * self.hparams.aggressive_steps), 1.)
                 else:
                     return 0.
 
@@ -400,11 +429,11 @@ class NanoCrystalVAE(pl.LightningModule):
         optimizer = RMSprop([
             dict(
                 params=encoder_params,
-                lr=ENCODER_LR
+                lr=self.hparams.encoder_lr
             ),
             dict(
                 params=decoder_params,
-                lr=DECODER_LR
+                lr=self.hparams.decoder_lr
             )
         ])
 
