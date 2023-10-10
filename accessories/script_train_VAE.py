@@ -63,6 +63,7 @@ def fit(
         graph_embds_dim: int = 16,
         latent_dim: int = 32,
         max_filters: int = 128,
+        num_filters: List = None,
         filter_size: Union[List, Tuple] = [5, 3, 3],
         strides: Union[List, Tuple] = [2, 2, 1],
         coeffs: Union[List, Tuple] = (1, 2, 15),
@@ -91,6 +92,7 @@ def fit(
         coeffs=coeffs,
         latent_dim=latent_dim,
         max_filters=max_filters,
+        num_filters=num_filters,
         filter_size=filter_size,
         strides=strides,
     )
@@ -243,6 +245,7 @@ if __name__ == '__main__':
         graph_embds_dim = 16,
         latent_dim = 32,
         max_filters = 128,
+        num_filters = None,
         filter_size = [5, 3, 3],
         strides = [2, 2, 1],
         coeffs = (1, 2, 15),
