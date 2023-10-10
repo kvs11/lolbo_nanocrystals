@@ -41,6 +41,7 @@ class EncoderAndRegressor(nn.Module):
             coeffs: Tuple = (1, 2, 10,),
             latent_dim: int = 32, 
             max_filters: int = 128, 
+            num_filters: List = None,
             filter_size: List = [5, 3, 3], 
             strides: List = [2, 2, 1],
             encoder_lr: float = 1e-4,
@@ -59,12 +60,15 @@ class EncoderAndRegressor(nn.Module):
         self.regression_dim = regression_dim
         self.graph_embds_dim = graph_embds_dim
         self.latent_dim = latent_dim
-        self.max_filters = max_filters
         self.filter_size = filter_size
         self.strides = strides
         self.coeff_recon = coeffs[0]
         self.coeff_KL = coeffs[1]
         self.coeff_reg = coeffs[2]
+
+        if num_filters is not None:
+            max_filters = max(num_filters)
+        self.max_filters = max_filters
 
         # Build Encoder layers
         modules = []
@@ -72,6 +76,10 @@ class EncoderAndRegressor(nn.Module):
         in_channels = [channel_dim, max_filters//4, max_filters//2]
         out_channels = [max_filters//4, max_filters//2, max_filters]
         paddings = [2, 1, 1]
+
+        if num_filters is not None:
+            in_channels = [channel_dim, num_filters[0], num_filters[1]]
+            out_channels = num_filters
 
         for i, stride in enumerate(self.strides):
             modules.append(
@@ -131,6 +139,7 @@ class Decoder(nn.Module):
             coeffs: Tuple = (1, 2, 10,),
             latent_dim: int = 32, 
             max_filters: int = 128, 
+            num_filters: List = None,
             filter_size: List = [5, 3, 3], 
             strides: List = [2, 2, 1],
             encoder_lr: float = 1e-4,
@@ -149,9 +158,14 @@ class Decoder(nn.Module):
         self.regression_dim = regression_dim
         self.graph_embds_dim = graph_embds_dim
         self.latent_dim = latent_dim
-        self.max_filters = max_filters
         self.filter_size = filter_size
         self.strides = strides
+
+        # NOTE: The max_filters attribute in NCVAE will be different from 
+        # the EncoderandRegressor and Decoder because of this. Be mindful.
+        if num_filters is not None:
+            max_filters = max(num_filters)
+        self.max_filters = max_filters
 
         # Build Decoder
         # decoder initial layers if latent dim < 64
@@ -172,6 +186,9 @@ class Decoder(nn.Module):
 
         dec_in_channels = [max_filters, max_filters//2, max_filters//4]
         dec_out_channels = [max_filters//2, max_filters//4, channel_dim]
+        if num_filters is not None:
+            dec_in_channels = [num_filters[2], num_filters[1], num_filters[0]]
+            dec_out_channels = [num_filters[1], num_filters[0], channel_dim]
 
         paddings = [1, 1, 2]
         out_paddings = [0, 1, 1]
@@ -226,6 +243,7 @@ class NanoCrystalVAE(pl.LightningModule):
             coeffs: Tuple = (1, 2, 10,),
             latent_dim: int = 32, 
             max_filters: int = 128, 
+            num_filters: List = None,
             filter_size: List = [5, 3, 3], 
             strides: List = [2, 2, 1],
             encoder_lr: float = 1e-4,
@@ -340,7 +358,7 @@ class NanoCrystalVAE(pl.LightningModule):
 
         # Log losses every step
         for k, v in loss_dict.items():
-            self.log('train/' + k, v, on_step=True, on_epoch=False, prog_bar=False, logger=True)
+            self.log('train/' + k, v, on_step=True, on_epoch=True, prog_bar=False, logger=True)
 
         return loss_dict['loss']
 
@@ -378,7 +396,7 @@ class NanoCrystalVAE(pl.LightningModule):
 
         # Log losses every step
         for k, v in loss_dict.items():
-            self.log('validation/' + k, v, on_step=True, on_epoch=False, prog_bar=False, logger=True, sync_dist=True)
+            self.log('validation/' + k, v, on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
 
         return loss_dict['loss']    
 
