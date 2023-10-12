@@ -75,12 +75,43 @@ class EncoderAndRegressor(nn.Module):
 
         in_channels = [channel_dim, max_filters//4, max_filters//2]
         out_channels = [max_filters//4, max_filters//2, max_filters]
-        paddings = [2, 1, 1]
 
         if num_filters is not None:
             in_channels = [channel_dim, num_filters[0], num_filters[1]]
             out_channels = num_filters
 
+        # Get heights_in and heights_out
+        heights_out = []
+        hi = input_dim
+        for i, st in enumerate(strides):
+            hi = round(hi / st)
+            heights_out.append(hi)
+        self.heights_out = heights_out
+
+        heights_in = [input_dim, heights_out[0], heights_out[1]]
+
+        # Get the paddings that correspond to heights_in and heights_out
+        def get_padding(input_dim, desired_output_dim, stride, filt_size, dilation=1):
+            """
+            H_out = [H_in + 2*padding - dilation*(kernel_size-1) - 1 // stride ] + 1
+            """
+            padding = ((desired_output_dim-1)*stride - input_dim + \
+                       dilation*(filt_size-1) + 1) / 2
+            if padding %1 !=0:
+                padding += 1 # upper bound
+            if (input_dim + 2*int(padding) - dilation*(filt_size-1) -1) \
+                                //stride + 1 != desired_output_dim:
+                print ('Sorry, the padding in encoder cannot be symmetric on both ends'
+                    ' of input to get desired output. Modify (typically decrease) '
+                    'the filter size of the latter conv. layers.. ')
+                return None
+            return int(padding)
+
+        paddings = []
+        for i, h_in in enumerate(heights_in):
+            paddings.append(get_padding(h_in, heights_out[i], self.strides[i], self.filter_size[i]))
+
+        # Create Conv1d layers
         for i, stride in enumerate(self.strides):
             modules.append(
                 nn.Sequential(
@@ -96,7 +127,7 @@ class EncoderAndRegressor(nn.Module):
 
         # final encoder layers if latent space < 64
         self.encoder_final_2 = nn.Sequential(
-            nn.Linear(self.input_dim//4 * out_channels[-1] + graph_embds_dim, 1024),
+            nn.Linear(self.heights_out[2] * out_channels[-1] + graph_embds_dim, 1024),
             nn.ReLU(),
             nn.Linear(1024, 256),
             nn.Sigmoid()
@@ -167,12 +198,24 @@ class Decoder(nn.Module):
             max_filters = max(num_filters)
         self.max_filters = max_filters
 
+        # Get heights_in and heights_out as in Encoder & re-order them
+        heights_out = []
+        hi = input_dim
+        for i, st in enumerate(strides):
+            hi = round(hi / st)
+            heights_out.append(hi)
+        self.heights_out = heights_out
+
+        heights_in = [input_dim, heights_out[0], heights_out[1]]
+        dec_heights_in = [heights_out[2], heights_out[1], heights_out[0]]
+        dec_heights_out = [heights_out[1], heights_out[0], input_dim]
+
         # Build Decoder
         # decoder initial layers if latent dim < 64
         self.decoder_initial_2 = nn.Sequential(
             nn.Linear(self.latent_dim, 256),
             nn.ReLU(),
-            nn.Linear(256, max_filters * self.input_dim//4),
+            nn.Linear(256, max_filters * dec_heights_in[0]),
             nn.ReLU()
         )
 
@@ -190,8 +233,37 @@ class Decoder(nn.Module):
             dec_in_channels = [num_filters[2], num_filters[1], num_filters[0]]
             dec_out_channels = [num_filters[1], num_filters[0], channel_dim]
 
-        paddings = [1, 1, 2]
-        out_paddings = [0, 1, 1]
+        # Get in_paddings and out_paddings for ConvTranspose2D layers
+        def get_dec_padding(input_dim, desired_output_dim, 
+                            stride, filt_size, dilation=1):
+            """
+            H_out = (H_in-1)*stride[0]- 2*padding[0] + 
+                    dilation[0]*(kernel_size[0]-1) + output_padding[0] + 1
+            """
+            pad_out = 0
+            while pad_out < stride and pad_out < dilation:
+                pad_in = ((input_dim-1)*stride - desired_output_dim + \
+                        dilation*(filt_size-1) + pad_out+1) / 2
+                if pad_in %1 ==0: 
+                    break
+                else:
+                    pad_in += 0.5
+                    if ((input_dim-1)*stride - 2*pad_in + \
+                        dilation*(filt_size-1) + pad_out+1) == desired_output_dim:
+                        break
+                    pad_out += 1
+            if pad_in %1 !=0:
+                print ('Sorry, padding pairing does not exist with current settings..')
+                return pad_in, pad_out
+            return int(pad_in), int(pad_out)
+
+        dec_in_paddings = []
+        dec_out_paddings = []
+        for i in range(len(strides)):
+            in_pad, out_pad = get_dec_padding(dec_heights_in[i], dec_heights_out[i],
+                                            dec_strides[i], dec_filter_size[i])
+            dec_in_paddings.append(in_pad)
+            dec_out_paddings.append(out_pad) 
 
         # decoder conv transpose layers
         modules = []
@@ -202,8 +274,8 @@ class Decoder(nn.Module):
                         out_channels=dec_out_channels[i],
                         kernel_size=(dec_filter_size[i], 1),
                         stride=(dec_strides[i], 1),
-                        padding=(paddings[i], 0),
-                        output_padding=(out_paddings[i], 0)),
+                        padding=(dec_in_paddings[i], 0),
+                        output_padding=(dec_out_paddings[i], 0)),
                     nn.BatchNorm2d(dec_out_channels[i]),
                     nn.ReLU())
             )
@@ -215,15 +287,15 @@ class Decoder(nn.Module):
                                out_channels=dec_out_channels[-1],
                                kernel_size=(dec_filter_size[-1], 1),
                                stride=(dec_strides[-1], 1),
-                               padding=(paddings[-1], 0),
-                               output_padding=(out_paddings[-1], 0)),
+                               padding=(dec_in_paddings[-1], 0),
+                               output_padding=(dec_out_paddings[-1], 0)),
             nn.Sigmoid()
         )
 
     def forward(self, z: Tensor) -> Any:
         
         result = self.decoder_initial_2(z)
-        result = result.view(-1, self.max_filters, self.input_dim//4, 1)
+        result = result.view(-1, self.max_filters, self.heights_out[2], 1)
         result = self.decoder_batch_norm_1(result)
         result = self.decoder_conv_transpose_layers(result)
         result = self.decoder_final_layer(result)
