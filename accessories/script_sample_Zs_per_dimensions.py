@@ -1,6 +1,8 @@
 
 """
-This script takes a set of data points, 
+This script takes a set of data points, finds the minimum and maximum values for
+each dimension, and then generates samples ensuring that one dimension varies 
+incrementally within its min and max values while fixing the others.
 """
 import os, shutil
 import numpy as np
