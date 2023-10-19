@@ -79,7 +79,7 @@ n_bins = 16
 hist_plot_name = "train_latent_hist.png"
 
 
-
+print ("Input parameters read. Proceeding with post-analysis..")
 ######### 1. script_Dataset_to_LatentZs
 
 
@@ -95,6 +95,7 @@ train_latent_Zs = script_Dataset_to_LatentZs.get_latent_Zs(
         save_to_npy_file=save_to_npy_file
 )
 os.rename('latent_Zs.npy', train_latent_Zs_path)
+print ("Train set latent Zs created and saved..")
 
 input_x_path = test_PC_array_path
 input_graph_embds_path = test_embds_path 
@@ -108,10 +109,10 @@ test_latent_Zs = script_Dataset_to_LatentZs.get_latent_Zs(
         save_to_npy_file=save_to_npy_file
 )
 os.rename('latent_Zs.npy', test_latent_Zs_path)
-
+print ("Test set latent Zs created and saved..")
 
 ######### 2. Get the UMPA embeddings ; use script_Zs_to_UMAPEmbeds
-
+print ("Generating 2D-UMAP plot of Train set..")
 Y_array_path = train_Y_array_path
 latent_Zs_path = train_latent_Zs_path
 plot_title = "Training set latent space"
@@ -120,6 +121,7 @@ script_Zs_to_UMAPEmbeds.get_UMAP_plot(Y_array_path, latent_Zs_path,
                                       n_neighbors, n_epochs, min_dist, 
                                       plot_title, plot_type, plot_name, n_intervals)
 
+print ("Generating 2D-UMAP plot of Test set..")
 Y_array_path = test_Y_array_path
 latent_Zs_path = test_latent_Zs_path
 plot_title = "Test set latent space"
@@ -128,6 +130,7 @@ script_Zs_to_UMAPEmbeds.get_UMAP_plot(Y_array_path, latent_Zs_path,
                                       n_neighbors, n_epochs, min_dist, 
                                       plot_title, plot_type, plot_name, n_intervals)
 
+print ("Generating 2D-UMAP plot of joint Train/Test set..")
 # joint training and test set umap plot
 joint_latent_Zs = np.concatenate((train_latent_Zs, test_latent_Zs), axis=0)
 train_Ys = np.load(train_Y_array_path, allow_pickle=True).astype('float32')
@@ -152,6 +155,7 @@ plt.tight_layout()
 plt.savefig(fname="umap_joint_train_test.png")
 plt.close()
 
+print ("Generating 2D-UMAP dual plot of Train/Test sets..")
 # plot dual plot train and test subplots
 fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(14, 6))
 
@@ -181,5 +185,7 @@ plt.close()
 
 ######### 3. Train latent space hist ; script_plot_all_latent_dims
 
+print ("Creating all latent dims distribution plot..")
 script_plot_all_latent_dims.plot_latent_hist(train_latent_Zs.numpy(), latent_space_dims, n_bins, hist_plot_name)
 
+print ("Done!!!")
