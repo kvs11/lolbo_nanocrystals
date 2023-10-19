@@ -73,6 +73,10 @@ class lammps_code(object):
         if 'atom_style' in energy_params:
             self.atom_style = energy_params['atom_style']
 
+        self.species_dict = None
+        self.min_dist_dict = None
+        self.max_dist_dict = None
+
     def prep_job_folder(self, astr, astr_label):
         """
         Function to:
@@ -507,6 +511,10 @@ class vasp_code(object):
         self.sym_mu_dict = {}
         for key, value in energy_params['element_syms'].items():
             self.sym_mu_dict[value] = energy_params['mu'][key]
+
+        self.species_dict = None
+        self.min_dist_dict = None
+        self.max_dist_dict = None
 
         # default parameters for INCAR (only if necessary)
         # Or directly use the input files the user provided.
@@ -985,6 +993,10 @@ def make_energy_code_object(yaml_file, main_path):
     else:
         print('Please set energy_code in inputs as one of vasp'
             'or lammps only')
+        
+    energy_code.species_dict = i_dict['species']
+    energy_code.min_dist_dict = i_dict['min_dist']
+    energy_code.max_dist_dict = i_dict['max_dist']
     print(f"Energy code: {energy_pkg}")
 
     # Create a calcs directory same as in Fantastx calcs dir
