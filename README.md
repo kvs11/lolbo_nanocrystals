@@ -1,4 +1,4 @@
-# lolbo_nanocrystals
+# GM_FANTASTX
 
 ### Nanocrystal structure search combining genetic algorithm and generative VAE with latent space Bayesian optimization
 
@@ -14,7 +14,6 @@ Status: under development
 
 TODO:
 
-1. Integrate FANTASTX -  for a continuous flow of GA and GenVAE+LOLBO
+1. Integrate FANTASTX -  for a continuous flow of GA and FANTASTX+GenVAE+LOLBO
 2. Documentation
-3. Add examples with CdTe system
-4. Test case with IrOx nanocrystals
+3. Add examples with CdTe and Na-P-S systems
