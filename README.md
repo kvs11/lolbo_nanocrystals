@@ -10,7 +10,9 @@ A nanocrystal VAE which uses graph embeddings for structures creates an organize
 
 Local Latent Bayesian optimization (LOLBO) is performed on the organized latent space from VAE to generate the next nanocrystal structures. 
 
-Original LOLBO repository here: https://github.com/nataliemaus/lolbo
+[Nanocrystal_utils](https://github.com/kvs11/GM_Fantastx/tree/main/lolbo/utils/nanocrystal_utils) includes all the ML models and dataset related features related to the solids or crystalline materials. Whereas dataset curation from VASP outputs can be done simply using the scripts in [accessories](https://github.com/kvs11/GM_Fantastx/tree/main/accessories). 
+
+Lolbo was originally tested on molecular geometries using Selfies representation. Original LOLBO repository [here](https://github.com/nataliemaus/lolbo)
 
 Status: under development
 
